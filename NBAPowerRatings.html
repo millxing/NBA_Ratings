@@ -69,6 +69,16 @@
         .form-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
         .form-field__label { font-size:13px; font-weight:600; color:var(--muted); }
         .form-field__select { width:100%; min-width:0; height:44px; padding:0 12px; background:var(--bg); border:1px solid #50616e; color:var(--text); border-radius:5px; cursor:pointer; }
+        /* Safari's native date bezel can size itself beyond its grid track. */
+        input[type="date"].form-field__select {
+            -webkit-appearance:none;
+            appearance:none;
+            display:block;
+            box-sizing:border-box;
+            max-width:100%;
+            min-inline-size:0;
+        }
+        input[type="date"]::-webkit-date-and-time-value { min-width:0; text-align:left; }
         .form-field__select:hover { border-color:var(--muted); }
         button { cursor:pointer; transition:background .15s,color .15s; }
         button:active { transform:translateY(1px); }
