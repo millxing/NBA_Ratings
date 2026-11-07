@@ -1,0 +1,75 @@
+# NBA Ratings
+
+NBA team power ratings and matchup projections, adapted from the NFL Ratings app's layout and ordinary least squares model.
+
+## Open the app
+
+Open `NBAPowerRatings.html` directly in a browser. The data bundle loads locally; no server, installation, or build step is required. `index.html` redirects to the app for static hosting, including GitHub Pages.
+
+The app includes:
+
+- Seasons from 2000–01 through 2026–27, using historical team names and the actual number of teams.
+- Inclusive start/end dates, with automatic recalculation.
+- Regular season, playoffs, and all-games selections.
+- Sortable ratings, wins/losses, point differential, strength of schedule, and rating/rank movement since seven days before the selected end date.
+- A matchup calculator with neutral court or either team's home court.
+- Saved filter, sorting, and matchup preferences in browser storage.
+- Full-game NBA CSV import and refresh of the bundled dataset.
+
+## Data
+
+`data/games.js` is a portable export of `../NBA_Data/team_game_logs/team_game_logs_YYYY-YY.csv`. It contains the columns needed for ratings, with one row per completed game. Quarter, clutch, and garbage-filtered datasets are deliberately excluded. The initial export contains 33,582 games, through November 6, 2026.
+
+The parser handles the source's ISO and M/D/YY dates, alternate `playoff`/`playoffs` and `playin`/`play_in` labels, and case variations in neutral-site flags. Future-dated rows are excluded. Invalid completed scores, duplicate game IDs, and malformed identities are rejected.
+
+Regular-season selections include NBA Cup semifinals, which count toward regular-season records. The Cup final and play-in games appear only in All games. Playoffs includes postseason playoff series, excluding play-ins. Only recorded results are used; no future schedule is required.
+
+### Update results
+
+After NBA_Data has newer game logs, run:
+
+```sh
+python3 scripts/sync-data.py
+```
+
+Or specify a different NBA_Data directory:
+
+```sh
+python3 scripts/sync-data.py --source /path/to/NBA_Data
+```
+
+Then click **Refresh data** in Source details, or reload the app. If hosted, publish the updated `data/games.js` alongside the app. Refresh does not run the export or fetch new NBA results itself.
+
+**Import CSV** loads a full-game team_game_logs file for the current session, replacing the bundled dataset. Refresh restores the bundle. Invalid imports leave the previous dataset and ratings intact.
+
+## Model
+
+The model preserves the NFL app's two-stage fitting procedure:
+
+1. Estimate home-court advantage and team effects using non-neutral games.
+2. Hold that advantage fixed and estimate team ratings from all selected games, applying zero home advantage at neutral sites.
+3. Center team ratings at zero. A rating measures points above or below the average participating team. SOS is rating minus average scoring margin, matching the NFL app's definition.
+
+Ratings use the teams represented in the chosen season and game category. Narrow ranges with missing teams or disconnected opponents cannot identify all ratings and produce a clear error. An entirely neutral-site selection, such as the 2020 playoffs, cannot estimate home-court advantage under this model; use a wider game selection including non-neutral games. No arbitrary fallback advantage is inserted.
+
+Movement uses the same start date and game selection, with the end date moved back seven calendar days. It is unavailable when the earlier sample cannot identify every team's rating. Matchup projections estimate a margin, not a total score or betting probability.
+
+## Verification
+
+```sh
+node tests/ratings-model.cjs
+```
+
+This checks known coefficients, neutral-site treatment, singular samples, all 27 regular seasons, historical team counts, records, game classification, imports, and matchup arithmetic.
+
+Optional browser checks require Playwright and Chromium already installed:
+
+```sh
+node tests/browser.cjs
+```
+
+Set `PLAYWRIGHT_PATH` to a Playwright module path and `CHROMIUM_PATH` to a Chromium executable if they are not available at their defaults. Tests cover direct-file loading, sorting, dates, preferences, historical seasons, playoff and empty states, import/refresh, matchups, and mobile overflow. Screenshots are written to `/tmp`.
+
+## Attribution
+
+Adapted from `NFL_Ratings/NFLPowerRatings.html`; its original source header specifies MIT. Page content retains the original CC BY 4.0 attribution to [entangledparticles.xyz](https://entangledparticles.xyz/). NBA data remains subject to its original terms.

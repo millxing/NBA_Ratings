@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  ============================================================================
+  NBA Power Ratings Calculator
+  ============================================================================
+  A production-ready web application that calculates NBA team power ratings
+  using Ordinary Least Squares (OLS) regression on game data.
+  
+  Author: Senior JavaScript Developer
+  Style Guide: Airbnb JavaScript Style Guide
+  License: MIT
+  
+  Features:
+  - Bundled NBA game logs with CSV import
+  - Season and date range filtering
+  - OLS regression with home-field advantage adjustment
+  - Neutral site game handling
+  - Responsive, sports-themed UI design
+  ============================================================================
+-->
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Rob Schoen's NBA Power Ratings Calculator: Point Differential & Strength of Schedule">
+    <title>NBA Power Ratings</title>
+
+    <!-- Social sharing card -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="NBA Power Ratings | Rob Schoen">
+    <meta property="og:description" content="Point differential. Strength of schedule. A clearer view of NBA team strength.">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="NBA Power Ratings | Rob Schoen">
+    <meta name="twitter:description" content="Point differential. Strength of schedule. A clearer view of NBA team strength.">
+
+
+    <!-- 
+    Google Fonts: Using Oswald for bold headlines and Source Sans 3 for body text.
+    This combination provides a sports/athletic aesthetic while maintaining readability.
+  -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root { color-scheme:dark; --bg:#101519; --surface:#182026; --raised:#202b33; --line:#34424c; --text:#edf2f4; --muted:#afbdc7; --accent:#e8b568; --positive:#89d6ae; --negative:#f39c9c; }
+        * { box-sizing:border-box; }
+        body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 'Source Sans 3',system-ui,sans-serif; }
+        button,select,input { font:inherit; }
+        a { color:var(--accent); }
+        button,a,select,summary { -webkit-tap-highlight-color:transparent; }
+        :focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+        [hidden] { display:none!important; }
+        .container { max-width:1200px; margin:auto; padding:24px 32px 32px; }
+        .app-bar { display:flex; align-items:center; justify-content:space-between; gap:24px; border-bottom:1px solid var(--line); margin-bottom:24px; }
+        .header__title { font:500 24px/1.2 'Oswald',sans-serif; margin:0; letter-spacing:.015em; }
+        .header__title span { color:var(--muted); font:12px 'Source Sans 3',sans-serif; margin-left:8px; }
+        .view-nav { display:flex; gap:24px; }
+        .view-nav a { color:var(--muted); text-decoration:none; padding:16px 0; border-bottom:2px solid transparent; font-weight:600; }
+        .view-nav a[aria-current] { color:var(--accent); border-color:var(--accent); }
+        .view-nav a:hover { color:var(--text); }
+        .control-panel { display:grid; grid-template-columns:1fr; align-items:end; gap:16px; padding:18px; background:var(--surface); border:1px solid var(--line); border-radius:8px; }
+        .control-panel .controls-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+        .controls-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+        .form-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+        .form-field__label { font-size:13px; font-weight:600; color:var(--muted); }
+        .form-field__select { width:100%; min-width:0; height:44px; padding:0 12px; background:var(--bg); border:1px solid #50616e; color:var(--text); border-radius:5px; cursor:pointer; }
+        .form-field__select:hover { border-color:var(--muted); }
+        button { cursor:pointer; transition:background .15s,color .15s; }
+        button:active { transform:translateY(1px); }
+        button:disabled { opacity:.55; cursor:wait; }
+        .status-message { display:none; margin:14px 0; padding:10px 14px; border-left:3px solid var(--accent); background:var(--surface); }
+        .status-message--visible { display:block; }
+        .status-message--error { border-color:var(--negative); color:var(--negative); }
+        .status-message--success { border-color:var(--positive); }
+        .week-availability { margin:0; color:var(--muted); font-size:14px; }
+        .range-adjustment { margin:0; font-size:14px; color:var(--accent); }
+        .range-adjustment:empty { display:none; }
+        .empty-state { color:var(--muted); padding:24px 0; margin:0; }
+        .results-section { display:none; margin-top:24px; }
+        .results-section--visible { display:block; }
+        .results-header { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; }
+        h2 { font-size:20px; font-weight:600; margin:0; }
+        .results-meta,#analysis-context { color:var(--muted); font-size:14px; margin:0; }
+        .table-container { overflow:auto; border:1px solid var(--line); border-radius:7px; scrollbar-color:#637786 var(--surface); }
+        .results-table { border-collapse:separate; border-spacing:0; width:100%; min-width:850px; font-size:14px; font-variant-numeric:tabular-nums; }
+        .results-table th,.results-table td { padding:11px 12px; text-align:right; white-space:nowrap; border-bottom:1px solid #2b3740; }
+        .results-table th { background:var(--raised); color:var(--muted); font-size:13px; font-weight:600; }
+        .results-table th:nth-child(2),.results-table td:nth-child(2) { text-align:left; }
+        .results-table td { background:var(--surface); }
+        .results-table tbody tr:nth-child(even) td { background:#1b242b; }
+        .results-table tbody tr:hover td { background:#25323b; }
+        .results-table tr:last-child td { border-bottom:0; }
+        .results-table th:first-child,.results-table td:first-child { position:sticky; left:0; z-index:1; min-width:72px; width:72px; }
+        .results-table th:nth-child(2),.results-table td:nth-child(2) { position:sticky; left:72px; z-index:1; border-right:1px solid var(--line); }
+        .floating-head { position:fixed; top:0; overflow:hidden; z-index:4; border:1px solid var(--line); box-shadow:0 4px 12px #0004; }
+        .floating-head .results-table { table-layout:fixed; }
+        .mobile-matchup { display:none; }
+        .mobile-matchup table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; font-size:14px; }
+        .mobile-matchup th,.mobile-matchup td { padding:10px 8px; border-bottom:1px solid var(--line); text-align:right; }
+        .mobile-matchup th:first-child { text-align:left; color:var(--muted); font-weight:400; }
+        .mobile-matchup thead th { background:var(--raised); }
+        .mobile-matchup tbody tr:nth-child(2) { background:var(--surface); font-weight:700; }
+        .mobile-matchup caption { text-align:left; font-weight:600; margin-bottom:10px; }
+        .form-field__select { scroll-margin-top:60px; }
+        .sort-button { border:0; background:transparent; padding:0; color:inherit; font-weight:600; min-height:24px; }
+        .sort-button:hover,.sort-active { color:var(--accent)!important; }
+        .sort-indicator { font-size:10px; display:inline-block; width:10px; margin-left:3px; }
+        .rank-cell,.team-cell__abbr { color:var(--muted); }
+        .team-cell { font-weight:600; }
+        .team-cell__nickname { display:none; }
+        .team-cell__abbr { font-size:12px; font-weight:400; margin-left:8px; }
+        .rating-cell { font-weight:600; }
+        .rating-cell--positive { color:var(--positive); }
+        .rating-cell--negative { color:var(--negative); }
+        .rating-cell--neutral { color:var(--text); }
+        .movement { color:var(--muted); }
+        .hfa-display { display:flex; gap:8px; align-items:baseline; margin-top:16px; color:var(--muted); font-size:14px; }
+        .hfa-display__value { color:var(--text); font-weight:700; font-variant-numeric:tabular-nums; }
+        #comparison-note { font-size:14px; color:var(--muted); }
+        #comparison-note:empty { display:none; }
+        .table-help { display:flex; gap:16px; flex-wrap:wrap; color:var(--muted); font-size:13px; margin:10px 0 0; }
+        .table-help summary { cursor:pointer; }
+        .table-help p { max-width:680px; }
+        .scroll-hint { display:none; }
+        .v2-panel { margin:24px 0; }
+        #analysis-context { margin:6px 0 20px; }
+        #matchup-result { padding:20px; margin:24px 0; background:var(--surface); border-left:3px solid var(--accent); font-size:24px; font-weight:600; }
+        #matchup-result.is-notice { font-size:16px; color:var(--muted); }
+        .footer { padding-top:16px; color:var(--muted); font-size:13px; }
+        .license-notice { margin:0; line-height:1.7; }
+        .data-status { border-top:1px solid var(--line); margin-top:28px; padding-top:16px; color:var(--muted); font-size:13px; }
+        .data-summary { display:flex; gap:12px 24px; align-items:baseline; flex-wrap:wrap; }
+        .data-summary details { flex:1; min-width:160px; }
+        summary { cursor:pointer; }
+        .source-content { padding:4px 0 12px; max-width:720px; }
+        .v2-actions { display:flex; gap:10px; }
+        .v2-actions button { padding:8px 14px; background:var(--raised); border:1px solid #50616e; border-radius:5px; color:var(--text); }
+        .v2-actions button:hover { background:#34434e; }
+        .file-upload-section { grid-column:1/-1; padding-bottom:16px; border-bottom:1px solid var(--line); }
+        .file-upload-hint { color:var(--muted); font-size:14px; }
+        #storage-note { color:var(--accent); }
+        .skip-link { position:absolute; left:16px; top:-80px; padding:8px; background:var(--surface); z-index:5; }
+        .skip-link:focus { top:8px; }
+        @media(max-width:800px) {
+            .container { padding:18px 20px; }
+            .team-cell__abbr { display:none; }
+            .scroll-hint { display:block; margin:0 0 10px; }
+        }
+        @media(max-width:540px) {
+            .container { padding:16px; }
+            .app-bar { display:block; margin-bottom:18px; }
+            .header__title { font-size:22px; }
+            .view-nav { gap:24px; margin-top:6px; }
+            .view-nav a { padding:12px 0; font-size:15px; }
+            .control-panel { padding:14px; }
+            .controls-grid, .control-panel .controls-grid { grid-template-columns:1fr; gap:12px; }
+            .controls-grid .form-field:first-child { grid-column:1/-1; }
+            #matchup-view .controls-grid { grid-template-columns:1fr; }
+            .results-header { align-items:baseline; flex-wrap:wrap; }
+            .results-table th,.results-table td { padding:11px 6px; }
+            .results-table { min-width:0; }
+            .team-cell__full { display:none; }
+            .team-cell__nickname { display:inline; }
+            .results-table .sort-button { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; min-height:32px; }
+            .results-table .sort-indicator { margin-left:0; line-height:1; }
+            .results-table th:first-child,.results-table td:first-child { min-width:32px; width:32px; padding-left:4px; padding-right:4px; text-align:center; }
+            .results-table th:first-child .sort-label { display:none; }
+            .results-table th:first-child .sort-button { width:24px; }
+            .results-table th:first-child .sort-indicator { margin-left:0; }
+            .results-table th:nth-child(2),.results-table td:nth-child(2) { left:32px; }
+            #matchup-view .table-container { display:none; }
+            .mobile-matchup { display:block; }
+            #matchup-result { font-size:21px; padding:16px; }
+        }
+        @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
+    </style>
+</head>
+
+<body>
+    <!-- ========================================================================
+       MAIN APPLICATION CONTAINER
+       ======================================================================== -->
+    <a class="skip-link" href="#main-content">Skip to ratings</a>
+    <main class="container" id="main-content">
+
+        <!-- Page Header -->
+        <div class="app-bar"><header class="header">
+            <h1 class="header__title">NBA Power Ratings</h1>
+        </header>
+
+        <nav class="view-nav" aria-label="App views"><a href="#ratings" id="ratings-link" aria-current="page">Power ratings</a><a href="#matchup" id="matchup-link">Matchup calculator</a></nav></div>
+        <p id="view-message" hidden>Ratings are not available for this selection. <a href="#ratings">Review the season and date range</a>.</p>
+        <!-- Control Panel: Season and Date Selection -->
+        <section class="control-panel">
+
+            <!-- File Upload Fallback (hidden by default, shown on error) -->
+            <div id="file-upload-section" class="file-upload-section" style="display: none;">
+                <p class="file-upload-note">
+                    Bundled data loading failed. Upload a CSV file manually:
+                </p>
+                <input type="file" id="file-upload" accept=".csv" class="file-upload-input">
+                <p class="file-upload-hint">Choose a full-game team_game_logs CSV from NBA_Data.</p>
+            </div>
+
+            <div class="controls-grid">
+                <!-- Season Selector -->
+                <div class="form-field">
+                    <label for="season-select" class="form-field__label">Season</label>
+                    <select id="season-select" class="form-field__select">
+                        <!-- Options populated dynamically -->
+                    </select>
+                </div>
+
+                <!-- Start Week Selector -->
+                <div class="form-field">
+                    <label for="start-date" class="form-field__label">Start Date</label>
+                    <input type="date" id="start-date" class="form-field__select">
+                </div>
+
+                <!-- End Week Selector -->
+                <div class="form-field">
+                    <label for="end-date" class="form-field__label">End Date</label>
+                    <input type="date" id="end-date" class="form-field__select">
+                </div>
+                <div class="form-field"><label for="game-type" class="form-field__label">Games</label><select id="game-type" class="form-field__select"><option value="regular">Regular season</option><option value="playoffs">Playoffs</option><option value="all">All games</option></select></div>
+            </div>
+            <p id="week-availability" class="week-availability" role="status" aria-live="polite">Loading game results…</p>
+            <p id="range-adjustment" class="range-adjustment" role="status" aria-live="polite"></p>
+        </section>
+
+        <!-- Status Message Display -->
+        <div id="status-message" class="status-message" role="status" aria-live="polite"></div>
+
+        <p id="empty-state" class="empty-state">Ratings update automatically when you change the season, date range, or game selection.</p>
+        <!-- Results Section: Power Ratings Table -->
+        <section id="results-section" class="results-section">
+            <div class="results-header">
+                <h2 class="results-title">Power Ratings</h2>
+                <p class="results-meta">
+                    <span id="games-count">0</span> games · <span id="results-range"></span>
+                </p>
+            </div>
+
+            <p class="scroll-hint table-help">Scroll for record and other metrics →</p>
+            <div class="table-container" tabindex="0" role="region" aria-label="Power ratings">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="rank" scope="col" aria-sort="none"><button class="sort-button" type="button" aria-label="Sort by rank"><span class="sort-label">Rank </span><span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="team" scope="col" aria-sort="none"><button class="sort-button" type="button">Team <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="rating" scope="col" aria-sort="none"><button class="sort-button" type="button">Rating <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="wins" scope="col" aria-sort="none"><button class="sort-button" type="button">Wins <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="losses" scope="col" aria-sort="none"><button class="sort-button" type="button">Losses <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            
+                            <th data-sort="movementPoints" aria-sort="none" title="Rating points gained or lost since the seven days earlier"><button class="sort-button" type="button">Δ Rating <span class="sort-indicator" aria-hidden="true">↕</span></button></th><th data-sort="movementRanks" aria-sort="none" title="Ranks gained or lost since the seven days earlier"><button class="sort-button" type="button">Δ Rank <span class="sort-indicator" aria-hidden="true">↕</span></button></th><th data-sort="pointdiff" scope="col" aria-sort="none"><button class="sort-button" type="button">Pt Diff <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="sos" scope="col" aria-sort="none"><button class="sort-button" type="button">SOS <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body">
+                        <!-- Results populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="table-help"><details><summary>How to read the ratings</summary><p>Rating estimates points above or below an average team on a neutral court. Pt Diff is average scoring margin; SOS is strength of schedule. Δ Rating and Δ Rank compare with ratings through seven days earlier. Positive rank movement means a climb.</p></details></div>
+            <p id="comparison-note"></p>
+            <!-- Home Court Advantage Display -->
+            <div class="hfa-display" title="Estimated using non-neutral games only, adjusting for team strength. Ratings then use all games with this estimate fixed; neutral sites receive zero home advantage.">
+                <span class="hfa-display__label">Home Court Advantage:</span>
+                <span id="hfa-value" class="hfa-display__value">0.0</span>
+                <span class="hfa-display__unit">points</span>
+            </div>
+        </section>
+
+            <section id="matchup-view" hidden class="v2-panel" aria-label="Matchup calculator">
+              <h2>Matchup calculator</h2>
+              <p id="analysis-context"></p>
+              <div class="controls-grid">
+                <div class="form-field"><label for="matchup-a" class="form-field__label">Team A</label><select id="matchup-a" class="form-field__select"></select></div>
+                <div class="form-field"><label for="matchup-b" class="form-field__label">Team B</label><select id="matchup-b" class="form-field__select"></select></div>
+                <div class="form-field"><label for="matchup-venue" class="form-field__label">Venue</label><select id="matchup-venue" class="form-field__select"><option value="neutral">Neutral court</option><option value="a">Team A home</option><option value="b">Team B home</option></select></div>
+              </div>
+              <p id="matchup-result" aria-live="polite"></p>
+              <div class="table-container" tabindex="0" role="region" aria-label="Matchup statistics"><table class="results-table"><thead><tr><th>Rank</th><th>Team</th><th>Rating</th><th>W</th><th>L</th><th>Δ Rating</th><th>Δ Rank</th><th>Pt Diff</th><th>SOS</th></tr></thead><tbody id="matchup-stats"></tbody></table></div>
+              <div class="mobile-matchup" id="mobile-matchup"></div>
+            </section>
+
+        <section class="data-status" aria-label="Data status">
+            <div class="data-summary"><span id="data-freshness" aria-live="polite">Loading game data…</span><details><summary>Source details</summary><div class="source-content"><p id="data-source"></p><div class="v2-actions"><button id="refresh-data" type="button">Refresh data</button><button id="import-data" type="button">Import CSV</button></div></div></details></div>
+            <p id="storage-note" role="status"></p>
+        </section>
+
+        <footer class="footer">
+            <p class="license-notice">
+                Page content licensed under <a href="https://creativecommons.org/licenses/by/4.0/" rel="license">CC BY 4.0</a>
+                <span aria-hidden="true"> · </span>
+                <a href="https://entangledparticles.xyz/">entangledparticles.xyz</a>
+            </p>
+        </footer>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
