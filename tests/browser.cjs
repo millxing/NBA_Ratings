@@ -2,9 +2,9 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
-const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process.env.BROWSER || 'chromium'];
 (async()=>{
-    const browser = await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {})});
+    const browser = await browserType.launch({headless:true,...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {})});
     try {
         const page = await browser.newPage({viewport:{width:1440,height:1000}});
         const errors=[];
@@ -18,6 +18,32 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'playwright');
         await ready();
         assert.equal(await page.title(),'NBA Power Ratings');
         assert.equal(await page.locator('#season-select option').count(),27);
+        assert.equal(await page.locator('#games-count').innerText(),'132');
+        const scrubReady = async () => page.waitForFunction(() => document.querySelector('#results-section').getAttribute('aria-busy') === 'false');
+        assert.equal(await page.locator('#start-previous').isDisabled(),true);
+        assert.equal(await page.locator('#end-next').isDisabled(),true);
+        await page.locator('#end-previous').click();
+        await scrubReady();
+        assert.equal(await page.locator('#end-date').inputValue(),'2026-11-05');
+        assert.equal(await page.locator('#results-section').isVisible(),true);
+        await page.locator('#end-scrubber').focus();
+        await page.keyboard.press('ArrowLeft');
+        await scrubReady();
+        assert.equal(await page.locator('#end-date').inputValue(),'2026-11-04');
+        await page.locator('#start-next').click();
+        await scrubReady();
+        assert.equal(await page.locator('#start-date').inputValue(),'2026-10-21');
+        assert.equal(await page.locator('#end-date').inputValue(),'2026-11-04');
+        await page.locator('#start-previous').click();
+        await scrubReady();
+        // Rapid input must only publish the final requested range.
+        await page.locator('#end-scrubber').evaluate(input => {
+            for (const value of [Number(input.max)-3,Number(input.max)-1,Number(input.max)]) {
+                input.value=value; input.dispatchEvent(new Event('input',{bubbles:true}));
+            }
+        });
+        await scrubReady();
+        assert.equal(await page.locator('#end-date').inputValue(),'2026-11-06');
         assert.equal(await page.locator('#games-count').innerText(),'132');
         await page.locator('#results-section th[data-sort="team"] button').click();
         assert.match(await page.locator('#results-body tr').first().innerText(),/Atlanta/);
@@ -54,6 +80,8 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'playwright');
         await page.locator('#season-select').selectOption('2026');
         await page.waitForFunction(()=>document.querySelector('#week-availability').textContent.includes('No results'));
         assert.equal(await page.locator('#results-section').isVisible(),false);
+        assert.equal(await page.locator('#start-scrubber').isDisabled(),true);
+        assert.equal(await page.locator('#end-scrubber').isDisabled(),true);
         await page.locator('#game-type').selectOption('regular');
         await ready();
         await page.locator('#file-upload').setInputFiles({name:'bad.csv',mimeType:'text/csv',buffer:Buffer.from('bad\ndata')});
@@ -83,6 +111,6 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'playwright');
         await page.locator('#mobile-matchup').waitFor({state:'visible'});
         await page.screenshot({path:'/tmp/nba-ratings-matchup-mobile.png',fullPage:true});
         assert.deepEqual(errors,[]);
-        console.log('PASS: direct-file startup, sorting, date filtering, saved preferences, historical teams, playoffs, empty and insufficient ranges, CSV imports/rejection, refresh, matchup venues, mobile overflow and no runtime errors.');
+        console.log('PASS: direct-file startup, sorting, date scrubbing, rapid-input cancellation, date filtering, saved preferences, historical teams, playoffs, empty and insufficient ranges, CSV imports/rejection, refresh, matchup venues, mobile overflow and no runtime errors.');
     } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

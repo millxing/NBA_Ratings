@@ -735,6 +735,7 @@ let TEAM_INDEX_MAP = {}, INDEX_TEAM_MAP = {}, TEAM_NAMES = {};
 let NUM_TEAMS = 0, NUM_PREDICTORS = 1;
 let movement = new Map();
 let calculationVersion = 0;
+let scrubDates = [];
 
 function escapeHTML(value) {
     return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -824,6 +825,7 @@ function updateRange(reset = false) {
     const games = seasonGames();
     configureTeams(games);
     const dates = games.map(g => g.gameday).sort();
+    scrubDates = [...new Set(dates)];
     const first = dates[0], last = dates.at(-1);
     for (const input of [elements.startDate,elements.endDate]) {
         input.disabled = appState.loadingData || !games.length;
@@ -835,7 +837,53 @@ function updateRange(reset = false) {
         elements.endDate.value = elements.startDate.value;
         document.getElementById('range-adjustment').textContent = 'End date moved to match the start date.';
     }
+    syncScrubbers();
     document.getElementById('week-availability').textContent = games.length ? `${seasonLabel(elements.seasonSelect.value)} · Results through ${formatDate(last)} · ${games.length.toLocaleString()} games recorded` : `${seasonLabel(elements.seasonSelect.value)} · No results for this game selection.`;
+}
+// Keep the two thumbs within the selected interval. Manual date entry can
+// still use off-days; slider steps always correspond to recorded game dates.
+function syncScrubbers() {
+    for (const side of ['start','end']) {
+        const date = elements[side + 'Date'].value;
+        const slider = document.getElementById(side + '-scrubber');
+        const previous = document.getElementById(side + '-previous');
+        const next = document.getElementById(side + '-next');
+        const allowed = scrubDates.map((day,index) => ({day,index})).filter(({day}) =>
+            side === 'start' ? day <= elements.endDate.value : day >= elements.startDate.value);
+        const disabled = appState.loadingData || !allowed.length;
+        slider.min = allowed[0]?.index ?? 0;
+        slider.max = allowed.at(-1)?.index ?? 0;
+        const selected = side === 'start'
+            ? allowed.find(item => item.day >= date) || allowed.at(-1)
+            : allowed.findLast(item => item.day <= date) || allowed[0];
+        slider.value = selected?.index ?? 0;
+        slider.disabled = disabled || allowed.length < 2;
+        slider.setAttribute('aria-valuetext', date ? formatDate(date) : 'No game dates');
+        previous.disabled = disabled || !allowed.some(item => item.day < date);
+        next.disabled = disabled || !allowed.some(item => item.day > date);
+    }
+}
+function scrubDate(side, date) {
+    if (!date || appState.loadingData) return;
+    elements[side + 'Date'].value = date;
+    document.getElementById('range-adjustment').textContent = '';
+    syncScrubbers();
+    savePreferences();
+    calculateRatings(true);
+}
+function initializeScrubbers() {
+    for (const side of ['start','end']) {
+        document.getElementById(side + '-scrubber').addEventListener('input',event => {
+            scrubDate(side,scrubDates[Number(event.target.value)]);
+        });
+        for (const direction of ['previous','next']) {
+            document.getElementById(side + '-' + direction).addEventListener('click',() => {
+                const date = elements[side + 'Date'].value;
+                const next = direction === 'previous' ? scrubDates.findLast(day => day < date) : scrubDates.find(day => day > date);
+                scrubDate(side,next);
+            });
+        }
+    }
 }
 function calculateMovement(season,start,end,results) {
     movement.clear();
@@ -856,13 +904,18 @@ function calculateMovement(season,start,end,results) {
         note.textContent = 'Weekly movement unavailable: the earlier range does not contain enough games to estimate every team.';
     }
 }
-async function calculateRatings() {
+async function calculateRatings(scrubbing = false) {
     const version = ++calculationVersion;
-    invalidateResults();
-    if (!seasonGames().length) { hideStatus(); return; }
+    const keepVisible = scrubbing && appState.currentRatings.length > 0;
+    if (!keepVisible) invalidateResults();
+    if (!seasonGames().length) {
+        hideStatus();
+        elements.resultsSection.setAttribute('aria-busy','false');
+        return;
+    }
     const season = Number(elements.seasonSelect.value), start = elements.startDate.value, end = elements.endDate.value;
     elements.resultsSection.setAttribute('aria-busy','true');
-    showStatus('Updating ratings…','loading');
+    if (!keepVisible) showStatus('Updating ratings…','loading');
     try {
         await new Promise(resolve => setTimeout(resolve,100));
         if (version !== calculationVersion) return;
@@ -875,13 +928,17 @@ async function calculateRatings() {
         savePreferences();
         hideStatus();
     } catch (error) {
-        if (version === calculationVersion) showStatus(error.message,'error');
+        if (version === calculationVersion) {
+            invalidateResults();
+            showStatus(error.message,'error');
+        }
     } finally {
         if (version === calculationVersion) elements.resultsSection.setAttribute('aria-busy','false');
     }
 }
 function setLoading(loading) {
     appState.loadingData = loading;
+    syncScrubbers();
     for (const control of [elements.seasonSelect,elements.gameType,elements.startDate,elements.endDate,document.getElementById('refresh-data'),document.getElementById('import-data')]) control.disabled = loading;
     if (!loading) {
         elements.seasonSelect.disabled = elements.gameType.disabled = !appState.gamesData.length;
@@ -938,6 +995,7 @@ async function handleFileUpload(event) {
 }
 async function initializeApp() {
     initializeFloatingHeader();
+    initializeScrubbers();
     window.addEventListener('hashchange',showView);
     for (const control of [elements.seasonSelect,elements.gameType,elements.startDate,elements.endDate]) {
         control.addEventListener('change',() => {

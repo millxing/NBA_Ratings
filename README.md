@@ -9,7 +9,7 @@ Open `NBAPowerRatings.html` directly in a browser. The data bundle loads locally
 The app includes:
 
 - Seasons from 2000–01 through 2026–27, using historical team names and the actual number of teams.
-- Inclusive start/end dates, with automatic recalculation.
+- Inclusive start/end dates, with automatic recalculation. Compact sliders and previous/next buttons beneath both dates step through recorded game dates without crossing the other boundary. Arrow keys also move the focused slider; the table remains visible while scrubbing updates settle.
 - Regular season, playoffs, and all-games selections.
 - Sortable ratings, wins/losses, point differential, strength of schedule, and rating/rank movement since seven days before the selected end date.
 - A matchup calculator with neutral court or either team's home court.
@@ -68,7 +68,7 @@ Optional browser checks require Playwright and Chromium already installed:
 node tests/browser.cjs
 ```
 
-Set `PLAYWRIGHT_PATH` to a Playwright module path and `CHROMIUM_PATH` to a Chromium executable if they are not available at their defaults. Tests cover direct-file loading, sorting, dates, preferences, historical seasons, playoff and empty states, import/refresh, matchups, and mobile overflow. Screenshots are written to `/tmp`.
+Set `BROWSER=webkit` to run the same interaction checks in WebKit. Set `PLAYWRIGHT_PATH` to a Playwright module path and `CHROMIUM_PATH` to a Chromium executable if they are not available at their defaults. Tests cover direct-file loading, sorting, dates, preferences, historical seasons, playoff and empty states, import/refresh, matchups, and mobile overflow. Screenshots are written to `/tmp`.
 
 ## Attribution
 

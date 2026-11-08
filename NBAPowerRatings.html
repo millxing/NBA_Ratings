@@ -89,6 +89,11 @@
             line-height:42px;
         }
         input[type="date"]::-webkit-date-and-time-value { min-width:0; text-align:left; line-height:42px; }
+        .date-scrubber { display:flex; align-items:center; gap:4px; height:32px; }
+        .date-scrubber button { flex:0 0 32px; height:32px; padding:0; border:0; border-radius:4px; background:transparent; color:var(--muted); font-size:24px; line-height:1; }
+        .date-scrubber button:hover:not(:disabled) { color:var(--text); background:var(--raised); }
+        .date-scrubber input { flex:1; width:0; min-width:0; height:32px; margin:0; accent-color:var(--accent); cursor:pointer; }
+        .date-scrubber input:disabled { opacity:.4; cursor:default; }
         .form-field__select:hover { border-color:var(--muted); }
         button { cursor:pointer; transition:background .15s,color .15s; }
         button:active { transform:translateY(1px); }
@@ -236,16 +241,26 @@
                     </select>
                 </div>
 
-                <!-- Start Week Selector -->
+                <!-- Start Date Selector -->
                 <div class="form-field">
                     <label for="start-date" class="form-field__label">Start Date</label>
                     <input type="date" id="start-date" class="form-field__select">
+                    <div class="date-scrubber">
+                        <button type="button" id="start-previous" aria-label="Previous start date" title="Previous game date" disabled>‹</button>
+                        <input type="range" id="start-scrubber" min="0" max="0" value="0" step="1" aria-label="Scrub start date" disabled>
+                        <button type="button" id="start-next" aria-label="Next start date" title="Next game date" disabled>›</button>
+                    </div>
                 </div>
 
-                <!-- End Week Selector -->
+                <!-- End Date Selector -->
                 <div class="form-field">
                     <label for="end-date" class="form-field__label">End Date</label>
                     <input type="date" id="end-date" class="form-field__select">
+                    <div class="date-scrubber">
+                        <button type="button" id="end-previous" aria-label="Previous end date" title="Previous game date" disabled>‹</button>
+                        <input type="range" id="end-scrubber" min="0" max="0" value="0" step="1" aria-label="Scrub end date" disabled>
+                        <button type="button" id="end-next" aria-label="Next end date" title="Next game date" disabled>›</button>
+                    </div>
                 </div>
                 <div class="form-field"><label for="game-type" class="form-field__label">Games</label><select id="game-type" class="form-field__select"><option value="regular">Regular season</option><option value="playoffs">Playoffs</option><option value="all">All games</option></select></div>
             </div>
