@@ -396,21 +396,18 @@ function sortRatings(ratings) {
     return sorted;
 }
 
-function updateSortIndicators() {
+function updateSortHeaders() {
     const headers = document.querySelectorAll('.results-table th[data-sort]');
 
     headers.forEach((header) => {
         const column = header.getAttribute('data-sort');
-        const indicator = header.querySelector('.sort-indicator');
 
         if (column === appState.sortColumn) {
             header.classList.add('sort-active');
             header.setAttribute('aria-sort', appState.sortDirection === 'asc' ? 'ascending' : 'descending');
-            indicator.textContent = appState.sortDirection === 'asc' ? '▲' : '▼';
         } else {
             header.classList.remove('sort-active');
             header.setAttribute('aria-sort', 'none');
-            indicator.textContent = '↕';
         }
     });
 }
@@ -430,7 +427,7 @@ function handleSortClick(event) {
 
     savePreferences();
 
-    updateSortIndicators();
+    updateSortHeaders();
     renderTableBody();
 }
 
@@ -511,7 +508,7 @@ function renderResultsTable(results, gamesCount) {
     const tableHead = document.querySelector('.results-table thead');
     tableHead.onclick = handleSortClick;
 
-    updateSortIndicators();
+    updateSortHeaders();
 
     renderTableBody();
 

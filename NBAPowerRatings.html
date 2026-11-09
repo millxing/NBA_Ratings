@@ -133,9 +133,8 @@
         .mobile-matchup tbody tr:nth-child(2) { background:var(--surface); font-weight:700; }
         .mobile-matchup caption { text-align:left; font-weight:600; margin-bottom:10px; }
         .form-field__select { scroll-margin-top:60px; }
-        .sort-button { border:0; background:transparent; padding:0; color:inherit; font-weight:600; min-height:24px; }
+        .sort-button { width:100%; text-align:inherit; border:0; background:transparent; padding:0; color:inherit; font-weight:600; min-height:24px; }
         .sort-button:hover,.sort-active { color:var(--accent)!important; }
-        .sort-indicator { font-size:10px; display:inline-block; width:10px; margin-left:3px; }
         .rank-cell,.team-cell__abbr { color:var(--muted); }
         .team-cell { font-weight:600; }
         .team-cell__nickname { display:none; }
@@ -189,12 +188,8 @@
             .results-table { min-width:0; }
             .team-cell__full { display:none; }
             .team-cell__nickname { display:inline; }
-            .results-table .sort-button { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; min-height:32px; }
-            .results-table .sort-indicator { margin-left:0; line-height:1; }
-            .results-table th:first-child,.results-table td:first-child { min-width:32px; width:32px; padding-left:4px; padding-right:4px; text-align:center; }
-            .results-table th:first-child .sort-label { display:none; }
-            .results-table th:first-child .sort-button { width:24px; }
-            .results-table th:first-child .sort-indicator { margin-left:0; }
+            .results-table .sort-button { min-height:32px; }
+            .results-table th:first-child,.results-table td:first-child { min-width:32px; width:32px; padding-left:4px; padding-right:4px; text-align:right; }
             .results-table th:nth-child(2),.results-table td:nth-child(2) { left:32px; }
             #matchup-view .table-container { display:none; }
             .mobile-matchup { display:block; }
@@ -284,17 +279,17 @@
                 <table class="results-table">
                     <thead>
                         <tr>
-                            <th data-sort="rank" scope="col" aria-sort="none"><button class="sort-button" type="button" aria-label="Sort by rank"><span class="sort-label">Rank </span><span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                            <th data-sort="team" scope="col" aria-sort="none"><button class="sort-button" type="button">Team <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                            <th data-sort="rating" scope="col" aria-sort="none"><button class="sort-button" type="button">Rating <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                            <th class="record-column" data-sort="wins" scope="col" aria-sort="none"><button class="sort-button" type="button" aria-label="Sort by wins">W <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                            <th class="record-column" data-sort="losses" scope="col" aria-sort="none"><button class="sort-button" type="button" aria-label="Sort by losses">L <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="rank" scope="col" aria-sort="none"><button class="sort-button" type="button" aria-label="Sort by rank">Rank</button></th>
+                            <th data-sort="team" scope="col" aria-sort="none"><button class="sort-button" type="button">Team</button></th>
+                            <th data-sort="rating" scope="col" aria-sort="none"><button class="sort-button" type="button">Rating</button></th>
+                            <th class="record-column" data-sort="wins" scope="col" aria-sort="none"><button class="sort-button" type="button" aria-label="Sort by wins">W</button></th>
+                            <th class="record-column" data-sort="losses" scope="col" aria-sort="none"><button class="sort-button" type="button" aria-label="Sort by losses">L</button></th>
                             
-                            <th data-sort="pct" scope="col" aria-sort="none"><button class="sort-button" type="button" aria-label="Sort by winning percentage">Pct <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                            <th data-sort="netRating" scope="col" aria-sort="none"><button class="sort-button" type="button">Net Rating <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                            <th data-sort="ortg" scope="col" aria-sort="none"><button class="sort-button" type="button">ORTG <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                            <th data-sort="drtg" scope="col" aria-sort="none"><button class="sort-button" type="button">DRTG <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                            <th data-sort="sos" scope="col" aria-sort="none"><button class="sort-button" type="button">SOS <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="pct" scope="col" aria-sort="none"><button class="sort-button" type="button" aria-label="Sort by winning percentage">Pct</button></th>
+                            <th data-sort="netRating" scope="col" aria-sort="none"><button class="sort-button" type="button">Net Rating</button></th>
+                            <th data-sort="ortg" scope="col" aria-sort="none"><button class="sort-button" type="button">ORTG</button></th>
+                            <th data-sort="drtg" scope="col" aria-sort="none"><button class="sort-button" type="button">DRTG</button></th>
+                            <th data-sort="sos" scope="col" aria-sort="none"><button class="sort-button" type="button">SOS</button></th>
                         </tr>
                     </thead>
                     <tbody id="results-body">

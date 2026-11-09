@@ -23,9 +23,24 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         assert.equal(await page.locator('#results-section th[data-sort="rating"]').getAttribute('aria-sort'),'descending');
         assert.equal(await page.title(),'NBA Power Ratings');
         const headers = await page.locator('#results-section thead th').allTextContents();
-        assert.ok(headers.some(text => text.trim().startsWith('W ')));
-        assert.ok(headers.some(text => text.trim().startsWith('L ')));
+        assert.ok(headers.some(text => text.trim() === 'W'));
+        assert.ok(headers.some(text => text.trim() === 'L'));
         assert.ok(headers.some(text => text.includes('Pct')));
+        const checkHeaderAlignment = async () => {
+            assert.equal(await page.locator('.sort-indicator').count(),0);
+            const columns = await page.locator('#results-section thead th').evaluateAll(headers =>
+                headers.map((header,index) => {
+                    const button=header.querySelector('button');
+                    const cell=document.querySelector('#results-body tr').children[index];
+                    return [getComputedStyle(header).textAlign,getComputedStyle(button).textAlign,getComputedStyle(cell).textAlign,button.textContent.trim()];
+                }));
+            columns.forEach(([header,button,cell,label],index) => {
+                const expected=index===1 ? 'left' : 'right';
+                assert.deepEqual([header,button,cell],[expected,expected,expected]);
+                assert.ok(label.length>0);
+            });
+        };
+        await checkHeaderAlignment();
         const widths = await page.locator('#results-section thead').evaluate(head =>
             [head.querySelector('[data-sort="wins"]').getBoundingClientRect().width,
              head.querySelector('[data-sort="losses"]').getBoundingClientRect().width]);
@@ -138,6 +153,7 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         await page.screenshot({path:'/tmp/nba-ratings-desktop.png',fullPage:true});
         await page.setViewportSize({width:390,height:844});
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
+        await checkHeaderAlignment();
         await page.screenshot({path:'/tmp/nba-ratings-mobile.png',fullPage:true});
         await page.locator('#matchup-link').click();
         await page.locator('#matchup-a').selectOption('BOS');
