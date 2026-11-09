@@ -46,7 +46,7 @@ for(const season of [...new Set(games.map(g=>g.season))]) {
  const result=context.calculatePowerRatings(fit(sample),sample);
  assert.equal(result.ratings.length,season<2004 ? 29 : 30);
  assert.ok(result.ratings.every(t=>[t.rating,t.ortg,t.drtg,t.netRating,t.sos].every(Number.isFinite)));
- result.ratings.forEach(t=>{ close(t.netRating,t.ortg-t.drtg); close(t.sos,t.rating-t.netRating); });
+ result.ratings.forEach(t=>{ close(t.netRating,t.ortg-t.drtg); close(t.sos,t.rating-t.netRating); close(t.pct,t.wins/(t.wins+t.losses)); });
  close(result.ratings.reduce((sum,t)=>sum+t.rating,0),0);
  assert.equal(result.ratings.reduce((sum,t)=>sum+t.wins,0),sample.length);
  assert.equal(result.ratings.reduce((sum,t)=>sum+t.losses,0),sample.length);
@@ -66,6 +66,10 @@ assert.throws(()=>context.parseCSV(header+validRow.replace(',90,25',',-1,25')),/
 assert.throws(()=>context.parseCSV(header+validRow.replace(',90,25',',NaN,25')),/Invalid possession stat/);
 assert.throws(()=>context.parseCSV(header+validRow.replace(',90,25,10,12,88,20,8,11',',0,0,0,0,0,0,0,0')),/Invalid estimated possessions/);
 assert.throws(()=>context.parseCSV('game_id,game_date\nx,2026-11-01'),/FGA\/FTA\/OREB\/TOV/);
+assert.equal(context.formatPct(8/10),'.800');
+assert.equal(context.formatPct(0),'.000');
+assert.equal(context.formatPct(1),'1.000');
+assert.equal(context.formatPct(null),'—');
 close(context.matchupMargin(5,2,'neutral',3),3);
 close(context.matchupMargin(5,2,'a',3),6);
 close(context.matchupMargin(5,2,'b',3),0);

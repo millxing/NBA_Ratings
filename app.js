@@ -291,6 +291,7 @@ function calculatePowerRatings(beta, games) {
             rating: rating,
             wins: record.wins,
             losses: record.losses,
+            pct: record.wins + record.losses > 0 ? record.wins / (record.wins + record.losses) : null,
             ties: record.ties,
             ...teamEfficiency,
             sos: sos,
@@ -374,6 +375,7 @@ function sortRatings(ratings) {
 
                 comparison = a.ties - b.ties;
                 break;
+            case 'pct':
             case 'netRating':
             case 'ortg':
             case 'drtg':
@@ -443,7 +445,7 @@ function renderTableBody() {
         const originalRank = appState.currentRatings
             .filter((t) => t.rating > teamData.rating).length + 1;
 
-        const { team, teamName, rating, wins, losses, netRating, ortg, drtg, sos } = teamData;
+        const { team, teamName, rating, wins, losses, pct, netRating, ortg, drtg, sos } = teamData;
 
         const row = document.createElement('tr');
 
@@ -479,6 +481,7 @@ function renderTableBody() {
   </td>
   <td class="record-cell">${wins}</td>
   <td class="record-cell">${losses}</td>
+  <td class="numeric-cell">${formatPct(pct)}</td>
   
   <td class="rating-cell numeric-cell ${netRatingClass}">
     ${signedValue(netRating)}
@@ -528,6 +531,10 @@ function readStored(key) {
 function writeStored(key, value) {
     try { localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value)); }
     catch { document.getElementById('storage-note').textContent = 'Browser storage is unavailable or full. You can still use the app, but data or settings may not persist.'; }
+}
+
+function formatPct(value) {
+    return value == null ? '—' : value.toFixed(3).replace(/^0/, '');
 }
 
 function signedValue(value) {
@@ -631,6 +638,7 @@ function renderMobileMatchup(teams) {
         ['Rank', t => appState.currentRatings.filter(other => other.rating > t.rating).length + 1],
         ['Rating', t => signedValue(t.rating)],
         ['Record (W–L)', t => `${t.wins}–${t.losses}`],
+        ['Pct', t => formatPct(t.pct)],
         ['Net Rating', t => signedValue(t.netRating)],
         ['ORTG', t => t.ortg.toFixed(1)],
         ['DRTG', t => t.drtg.toFixed(1)],
@@ -654,8 +662,10 @@ function renderMatchupStats(teams) {
         const row = document.createElement('tr');
         const rank = appState.currentRatings.filter(t => t.rating > team.rating).length + 1;
         const signed = signedValue;
-        for (const value of [rank, team.teamName, signed(team.rating), team.wins, team.losses, signed(team.netRating), team.ortg.toFixed(1), team.drtg.toFixed(1), signed(team.sos)]) {
-            const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell);
+        for (const value of [rank, team.teamName, signed(team.rating), team.wins, team.losses, formatPct(team.pct), signed(team.netRating), team.ortg.toFixed(1), team.drtg.toFixed(1), signed(team.sos)]) {
+            const cell = document.createElement('td');
+            if (row.children.length === 3 || row.children.length === 4) cell.className = 'record-cell';
+            cell.textContent = value; row.appendChild(cell);
         }
         body.appendChild(row);
     }

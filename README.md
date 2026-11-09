@@ -11,7 +11,7 @@ The app includes:
 - Seasons from 2000–01 through 2026–27, using historical team names and the actual number of teams.
 - Inclusive start/end dates, with automatic recalculation. Compact sliders and previous/next buttons beneath both dates step through recorded game dates without crossing the other boundary. Arrow keys also move the focused slider; the table remains visible while scrubbing updates settle.
 - Regular season, playoffs, and all-games selections.
-- Sortable adjusted ratings, wins/losses, Net Rating, ORTG, DRTG, and strength of schedule for the selected dates and game selection.
+- Sortable adjusted ratings, W/L, winning percentage (Pct), Net Rating, ORTG, DRTG, and strength of schedule for the selected dates and game selection.
 - A matchup calculator with neutral court or either team's home court.
 - Saved season, start date, game selection, and matchup preferences in browser storage. Each opening starts with Rating sorted highest first and the latest available end date for the selected season and game selection.
 - Full-game NBA CSV import and refresh of the bundled dataset.

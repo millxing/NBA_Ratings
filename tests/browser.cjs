@@ -23,12 +23,19 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         assert.equal(await page.locator('#results-section th[data-sort="rating"]').getAttribute('aria-sort'),'descending');
         assert.equal(await page.title(),'NBA Power Ratings');
         const headers = await page.locator('#results-section thead th').allTextContents();
+        assert.ok(headers.some(text => text.trim().startsWith('W ')));
+        assert.ok(headers.some(text => text.trim().startsWith('L ')));
+        assert.ok(headers.some(text => text.includes('Pct')));
+        const widths = await page.locator('#results-section thead').evaluate(head =>
+            [head.querySelector('[data-sort="wins"]').getBoundingClientRect().width,
+             head.querySelector('[data-sort="losses"]').getBoundingClientRect().width]);
+        assert.ok(widths.every(width => width < 60), `Record columns too wide: ${widths}`);
         assert.ok(headers.some(text => text.includes('Net Rating')));
         assert.ok(headers.some(text => text.includes('ORTG')));
         assert.ok(headers.some(text => text.includes('DRTG')));
         assert.ok(headers.every(text => !/Δ|Pt Diff/.test(text)));
-        assert.equal(await page.locator('#results-body tr').first().locator('td').count(),9);
-        for (const [column, direction] of [['ortg','descending'],['drtg','ascending'],['netRating','descending']]) {
+        assert.equal(await page.locator('#results-body tr').first().locator('td').count(),10);
+        for (const [column, direction] of [['pct','descending'],['ortg','descending'],['drtg','ascending'],['netRating','descending']]) {
             await page.locator(`#results-section th[data-sort="${column}"] button`).click();
             assert.equal(await page.locator(`#results-section th[data-sort="${column}"]`).getAttribute('aria-sort'),direction);
             assert.equal(await page.evaluate(() => {
@@ -72,7 +79,8 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         await page.locator('#matchup-b').selectOption('NYK');
         const neutral=await page.locator('#matchup-result').innerText();
         assert.match(neutral,/points per 100 possessions|Even matchup/);
-        assert.equal(await page.locator('#matchup-stats tr').first().locator('td').count(),9);
+        assert.equal(await page.locator('#matchup-stats tr').first().locator('td').count(),10);
+        assert.match(await page.locator('#mobile-matchup').textContent(),/Pct/);
         assert.match(await page.locator('#mobile-matchup').textContent(),/ORTG/);
         assert.match(await page.locator('#mobile-matchup').textContent(),/DRTG/);
         assert.doesNotMatch(await page.locator('#mobile-matchup').textContent(),/Δ|Pt Diff/);
