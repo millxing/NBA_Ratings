@@ -41,10 +41,13 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
             });
         };
         await checkHeaderAlignment();
-        const widths = await page.locator('#results-section thead').evaluate(head =>
-            [head.querySelector('[data-sort="wins"]').getBoundingClientRect().width,
-             head.querySelector('[data-sort="losses"]').getBoundingClientRect().width]);
-        assert.ok(widths.every(width => width < 60), `Record columns too wide: ${widths}`);
+        const checkColumnSpacing = async () => {
+            const widths = await page.locator('#results-section thead th').evaluateAll(headers =>
+                headers.slice(2).map(header => header.getBoundingClientRect().width));
+            assert.ok(Math.max(...widths)-Math.min(...widths)<1, `Numeric columns should be evenly spaced: ${widths}`);
+            assert.ok(Math.min(...widths)>=70, `Numeric columns are cramped: ${widths}`);
+        };
+        await checkColumnSpacing();
         assert.ok(headers.some(text => text.includes('Net Rating')));
         assert.ok(headers.some(text => text.includes('ORTG')));
         assert.ok(headers.some(text => text.includes('DRTG')));
@@ -154,6 +157,7 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         await page.setViewportSize({width:390,height:844});
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
         await checkHeaderAlignment();
+        await checkColumnSpacing();
         await page.screenshot({path:'/tmp/nba-ratings-mobile.png',fullPage:true});
         await page.locator('#matchup-link').click();
         await page.locator('#matchup-a').selectOption('BOS');

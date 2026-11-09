@@ -112,11 +112,10 @@
         h2 { font-size:20px; font-weight:600; margin:0; }
         .results-meta,#analysis-context { color:var(--muted); font-size:14px; margin:0; }
         .table-container { overflow:auto; border:1px solid var(--line); border-radius:7px; scrollbar-color:#637786 var(--surface); }
-        .results-table { border-collapse:separate; border-spacing:0; width:100%; min-width:850px; font-size:14px; font-variant-numeric:tabular-nums; }
+        .results-table { table-layout:fixed; border-collapse:separate; border-spacing:0; width:100%; min-width:850px; font-size:14px; font-variant-numeric:tabular-nums; }
         .results-table th,.results-table td { padding:11px 12px; text-align:right; white-space:nowrap; border-bottom:1px solid #2b3740; }
-        .results-table .record-column,.results-table .record-cell { width:1%; padding-left:8px; padding-right:8px; }
         .results-table th { background:var(--raised); color:var(--muted); font-size:13px; font-weight:600; }
-        .results-table th:nth-child(2),.results-table td:nth-child(2) { text-align:left; }
+        .results-table th:nth-child(2),.results-table td:nth-child(2) { width:25%; text-align:left; }
         .results-table td { background:var(--surface); }
         .results-table tbody tr:nth-child(even) td { background:#1b242b; }
         .results-table tbody tr:hover td { background:#25323b; }
@@ -185,12 +184,12 @@
             #matchup-view .controls-grid { grid-template-columns:1fr; }
             .results-header { align-items:baseline; flex-wrap:wrap; }
             .results-table th,.results-table td { padding:11px 6px; }
-            .results-table { min-width:0; }
+            .results-table { min-width:760px; }
             .team-cell__full { display:none; }
             .team-cell__nickname { display:inline; }
             .results-table .sort-button { min-height:32px; }
             .results-table th:first-child,.results-table td:first-child { min-width:32px; width:32px; padding-left:4px; padding-right:4px; text-align:right; }
-            .results-table th:nth-child(2),.results-table td:nth-child(2) { left:32px; }
+            .results-table th:nth-child(2),.results-table td:nth-child(2) { left:32px; width:130px; }
             #matchup-view .table-container { display:none; }
             .mobile-matchup { display:block; }
             #matchup-result { font-size:21px; padding:16px; }
