@@ -18,13 +18,32 @@ The app includes:
 
 ## Data
 
-`data/games.js` is a portable export of `../NBA_Data/team_game_logs/team_game_logs_YYYY-YY.csv`. It contains the columns needed for ratings, with one row per completed game. Quarter, clutch, and garbage-filtered datasets are deliberately excluded. The initial export contains 33,582 games, through November 6, 2026.
+`data/games.js` is a portable export of `../NBA_Data/team_game_logs/team_game_logs_YYYY-YY.csv`. It contains the columns needed for ratings, with one row per completed game. Quarter, clutch, and garbage-filtered datasets are deliberately excluded. The bundle grows as new results arrive; the app displays the latest included game date.
 
 The parser handles the source's ISO and M/D/YY dates, alternate `playoff`/`playoffs` and `playin`/`play_in` labels, and case variations in neutral-site flags. Future-dated rows are excluded. Invalid completed scores, duplicate game IDs, and malformed identities are rejected.
 
 Regular-season selections include NBA Cup semifinals, which count toward regular-season records. The Cup final and play-in games appear only in All games. Playoffs includes postseason playoff series, excluding play-ins. Only recorded results are used; no future schedule is required.
 
-### Update results
+### Automatic and manual updates
+
+GitHub Actions refreshes the bundle and publishes the site daily at **6:30 a.m. America/New_York**, adjusting for daylight saving time. Scheduled runs can start late. Each run fetches the latest `millxing/NBA_Data` game logs, exports the bundle, runs model checks, commits changed results, and deploys GitHub Pages. It does not collect NBA scores itself; results depend on NBA_Data being current.
+
+To trigger an update immediately from T3 chat or an authenticated terminal, run:
+
+```sh
+gh workflow run update-data.yml --repo millxing/NBA_Ratings
+```
+
+This bypasses the scheduled trigger, but still uses a GitHub Actions runner. View progress at https://github.com/millxing/NBA_Ratings/actions/workflows/update-data.yml or run:
+
+```sh
+gh run list --repo millxing/NBA_Ratings --workflow update-data.yml --limit 3
+```
+
+### Update the local copy
+
+The scheduled job updates GitHub and the hosted site. Run `git pull --ff-only` to bring those changes to this local checkout.
+
 
 After NBA_Data has newer game logs, run:
 

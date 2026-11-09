@@ -1,0 +1,66 @@
+name: Update NBA data
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '30 6 * * *'
+      timezone: America/New_York
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: nba-data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: millxing/NBA_Data
+          path: .nba-source
+          sparse-checkout: team_game_logs
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Export and validate results
+        run: |
+          python3 scripts/sync-data.py --source .nba-source
+          node tests/ratings-model.cjs
+      - name: Commit updated bundle when results changed
+        run: |
+          if ! git diff --quiet -- data/games.js; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add data/games.js
+            git commit -m "Update NBA results ($(TZ=America/New_York date +%F))"
+            git push origin HEAD:main
+          fi
+      # Bot commits do not trigger branch-based Pages builds, so deploy here.
+      - name: Prepare site
+        run: |
+          mkdir -p _site/data
+          cp index.html NBAPowerRatings.html app.js .nojekyll _site/
+          cp data/games.js _site/data/
+          cp -R assets _site/assets
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Publish updated site
+        id: deployment
+        uses: actions/deploy-pages@v4

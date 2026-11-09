@@ -7,7 +7,7 @@ const context = vm.createContext({console,document:{getElementById:()=>({value:'
 vm.runInContext(fs.readFileSync(path.join(root,'app.js'),'utf8'),context);
 vm.runInContext(fs.readFileSync(path.join(root,'data/games.js'),'utf8'),context);
 const games = context.parseCSV(context.window.NBA_CSV);
-assert.equal(games.length,33582);
+assert.ok(games.length >= 33582, 'The bundle must retain historical games as new results arrive.');
 const close = (a,b) => assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`);
 const fit = games => { const {X,y} = context.buildDesignMatrix(games); return context.performOLSRegression(X,y); };
 const teams = Array.from({length:30},(_,i)=>`T${i}`);
