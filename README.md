@@ -13,7 +13,7 @@ The app includes:
 - Regular season, playoffs, and all-games selections.
 - Sortable ratings, wins/losses, point differential, strength of schedule, and rating/rank movement since seven days before the selected end date.
 - A matchup calculator with neutral court or either team's home court.
-- Saved filter, sorting, and matchup preferences in browser storage.
+- Saved season, start date, game selection, and matchup preferences in browser storage. Each opening starts with Rating sorted highest first and the latest available end date for the selected season and game selection.
 - Full-game NBA CSV import and refresh of the bundled dataset.
 
 ## Data

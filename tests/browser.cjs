@@ -16,24 +16,29 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         };
         await page.goto(url);
         await ready();
+        const latest = await page.evaluate(() => {
+            const games = seasonGames();
+            return {dates:[...new Set(games.map(game => game.gameday))].sort(),count:String(games.length)};
+        });
+        assert.equal(await page.locator('#results-section th[data-sort="rating"]').getAttribute('aria-sort'),'descending');
         assert.equal(await page.title(),'NBA Power Ratings');
         assert.equal(await page.locator('#season-select option').count(),27);
-        assert.equal(await page.locator('#games-count').innerText(),'132');
+        assert.equal(await page.locator('#games-count').innerText(),latest.count);
         const scrubReady = async () => page.waitForFunction(() => document.querySelector('#results-section').getAttribute('aria-busy') === 'false');
         assert.equal(await page.locator('#start-previous').isDisabled(),true);
         assert.equal(await page.locator('#end-next').isDisabled(),true);
         await page.locator('#end-previous').click();
         await scrubReady();
-        assert.equal(await page.locator('#end-date').inputValue(),'2026-11-05');
+        assert.equal(await page.locator('#end-date').inputValue(),latest.dates.at(-2));
         assert.equal(await page.locator('#results-section').isVisible(),true);
         await page.locator('#end-scrubber').focus();
         await page.keyboard.press('ArrowLeft');
         await scrubReady();
-        assert.equal(await page.locator('#end-date').inputValue(),'2026-11-04');
+        assert.equal(await page.locator('#end-date').inputValue(),latest.dates.at(-3));
         await page.locator('#start-next').click();
         await scrubReady();
         assert.equal(await page.locator('#start-date').inputValue(),'2026-10-21');
-        assert.equal(await page.locator('#end-date').inputValue(),'2026-11-04');
+        assert.equal(await page.locator('#end-date').inputValue(),latest.dates.at(-3));
         await page.locator('#start-previous').click();
         await scrubReady();
         // Rapid input must only publish the final requested range.
@@ -43,8 +48,8 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
             }
         });
         await scrubReady();
-        assert.equal(await page.locator('#end-date').inputValue(),'2026-11-06');
-        assert.equal(await page.locator('#games-count').innerText(),'132');
+        assert.equal(await page.locator('#end-date').inputValue(),latest.dates.at(-1));
+        assert.equal(await page.locator('#games-count').innerText(),latest.count);
         await page.locator('#results-section th[data-sort="team"] button').click();
         assert.match(await page.locator('#results-body tr').first().innerText(),/Atlanta/);
         await page.locator('#matchup-link').click();
@@ -63,7 +68,8 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         assert.ok(Number(await page.locator('#games-count').innerText())<132);
         await page.reload();
         await ready();
-        assert.equal(await page.locator('#end-date').inputValue(),'2026-10-30');
+        assert.equal(await page.locator('#end-date').inputValue(),latest.dates.at(-1));
+        assert.equal(await page.locator('#results-section th[data-sort="rating"]').getAttribute('aria-sort'),'descending');
         await page.locator('#start-date').fill('2026-11-06');
         await page.locator('#start-date').dispatchEvent('change');
         await page.waitForFunction(()=>document.querySelector('#status-message').textContent.includes('Select a wider'));

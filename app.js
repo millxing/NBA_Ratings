@@ -730,7 +730,7 @@ const elements = {
     fileUploadSection: document.getElementById('file-upload-section'),
     fileUpload: document.getElementById('file-upload'),
 };
-const appState = {gamesData: [], currentRatings: [], currentHFA: 0, sortColumn: 'rank', sortDirection: 'asc', loadingData: false};
+const appState = {gamesData: [], currentRatings: [], currentHFA: 0, sortColumn: 'rating', sortDirection: 'desc', loadingData: false};
 let TEAM_INDEX_MAP = {}, INDEX_TEAM_MAP = {}, TEAM_NAMES = {};
 let NUM_TEAMS = 0, NUM_PREDICTORS = 1;
 let movement = new Map();
@@ -1017,10 +1017,9 @@ async function initializeApp() {
             if ([...elements.seasonSelect.options].some(o => o.value === prefs.season)) elements.seasonSelect.value = prefs.season;
             if (['regular','playoffs','all'].includes(prefs.type)) elements.gameType.value = prefs.type;
             elements.startDate.value = prefs.start || '';
-            elements.endDate.value = prefs.end || '';
+            // Always open at the latest result, even when an older range was saved.
+            elements.endDate.value = '';
             updateRange();
-            if (['rank','team','rating','wins','losses','pointdiff','sos','movementPoints','movementRanks'].includes(prefs.sortColumn)) appState.sortColumn = prefs.sortColumn;
-            if (['asc','desc'].includes(prefs.sortDirection)) appState.sortDirection = prefs.sortDirection;
             populateMatchups();
             for (const [id,value] of [['matchup-a',prefs.teamA],['matchup-b',prefs.teamB],['matchup-venue',prefs.venue]]) {
                 const select = document.getElementById(id);
