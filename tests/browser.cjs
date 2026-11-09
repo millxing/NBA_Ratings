@@ -22,6 +22,21 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         });
         assert.equal(await page.locator('#results-section th[data-sort="rating"]').getAttribute('aria-sort'),'descending');
         assert.equal(await page.title(),'NBA Power Ratings');
+        const headers = await page.locator('#results-section thead th').allTextContents();
+        assert.ok(headers.some(text => text.includes('Net Rating')));
+        assert.ok(headers.some(text => text.includes('ORTG')));
+        assert.ok(headers.some(text => text.includes('DRTG')));
+        assert.ok(headers.every(text => !/Δ|Pt Diff/.test(text)));
+        assert.equal(await page.locator('#results-body tr').first().locator('td').count(),9);
+        for (const [column, direction] of [['ortg','descending'],['drtg','ascending'],['netRating','descending']]) {
+            await page.locator(`#results-section th[data-sort="${column}"] button`).click();
+            assert.equal(await page.locator(`#results-section th[data-sort="${column}"]`).getAttribute('aria-sort'),direction);
+            assert.equal(await page.evaluate(() => {
+                const values=sortRatings(appState.currentRatings).map(team=>team[appState.sortColumn]);
+                return values.every((value,index)=>!index || (appState.sortDirection==='asc' ? value>=values[index-1] : value<=values[index-1]));
+            }),true);
+        }
+
         assert.equal(await page.locator('#season-select option').count(),27);
         assert.equal(await page.locator('#games-count').innerText(),latest.count);
         const scrubReady = async () => page.waitForFunction(() => document.querySelector('#results-section').getAttribute('aria-busy') === 'false');
@@ -56,6 +71,11 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         await page.locator('#matchup-a').selectOption('BOS');
         await page.locator('#matchup-b').selectOption('NYK');
         const neutral=await page.locator('#matchup-result').innerText();
+        assert.match(neutral,/points per 100 possessions|Even matchup/);
+        assert.equal(await page.locator('#matchup-stats tr').first().locator('td').count(),9);
+        assert.match(await page.locator('#mobile-matchup').textContent(),/ORTG/);
+        assert.match(await page.locator('#mobile-matchup').textContent(),/DRTG/);
+        assert.doesNotMatch(await page.locator('#mobile-matchup').textContent(),/Δ|Pt Diff/);
         await page.locator('#matchup-venue').selectOption('a');
         assert.notEqual(await page.locator('#matchup-result').innerText(),neutral);
         await page.locator('#matchup-b').selectOption('BOS');

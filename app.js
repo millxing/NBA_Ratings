@@ -171,7 +171,7 @@ function buildDesignMatrix(games) {
         X[rowIndex][homeIndex] = 1;
         X[rowIndex][awayIndex] = -1;
 
-        y[rowIndex] = game.home_score - game.away_score;
+        y[rowIndex] = 100 * (game.home_score - game.away_score) / game.possessions;
     });
 
     return { X, y, validGames: numGames };
@@ -239,67 +239,30 @@ function calculateTeamRecords(games) {
     return records;
 }
 
-function calculateRatingDecomposition(games) {
-    const teamStats = {};
+// Shared game possessions keep both teams on the same efficiency scale.
+function estimatePossessions(home, away) {
+    return ((home.fga + 0.44 * home.fta - home.oreb + home.tov) +
+        (away.fga + 0.44 * away.fta - away.oreb + away.tov)) / 2;
+}
 
-    Object.keys(TEAM_INDEX_MAP).forEach((team) => {
-        teamStats[team] = {
-            totalPointDiff: 0,
-            gameCount: 0,
-            opponentPointDiffs: [],
-        };
-    });
-
-    games.forEach((game) => {
-        const homeTeam = normalizeTeamAbbr(game.home_team);
-        const awayTeam = normalizeTeamAbbr(game.away_team);
-
-        if (!homeTeam || !awayTeam) return;
-
-        const pointDiff = game.home_score - game.away_score;
-
-        teamStats[homeTeam].totalPointDiff += pointDiff;
-        teamStats[homeTeam].gameCount += 1;
-
-        teamStats[awayTeam].totalPointDiff -= pointDiff;
-        teamStats[awayTeam].gameCount += 1;
-    });
-
-    const avgPointDiffs = {};
-    Object.keys(teamStats).forEach((team) => {
-        avgPointDiffs[team] = teamStats[team].gameCount > 0
-            ? teamStats[team].totalPointDiff / teamStats[team].gameCount
-            : 0;
-    });
-
-    games.forEach((game) => {
-        const homeTeam = normalizeTeamAbbr(game.home_team);
-        const awayTeam = normalizeTeamAbbr(game.away_team);
-
-        if (!homeTeam || !awayTeam) return;
-
-        teamStats[homeTeam].opponentPointDiffs.push(avgPointDiffs[awayTeam]);
-        teamStats[awayTeam].opponentPointDiffs.push(avgPointDiffs[homeTeam]);
-    });
-
-    const decomposition = {};
-    Object.keys(teamStats).forEach((team) => {
-        const avgPointDiff = avgPointDiffs[team];
-        const opponentAvg = teamStats[team].opponentPointDiffs.length > 0
-            ? teamStats[team].opponentPointDiffs.reduce((sum, val) => sum + val, 0) /
-              teamStats[team].opponentPointDiffs.length
-            : 0;
-
-        const sos = opponentAvg;
-
-        decomposition[team] = {
-            avgPointDiff,
-            sos,
-            gameCount: teamStats[team].gameCount,
-        };
-    });
-
-    return decomposition;
+function calculateTeamEfficiency(games) {
+    const stats = Object.fromEntries(Object.keys(TEAM_INDEX_MAP).map(team =>
+        [team, {pointsFor: 0, pointsAgainst: 0, possessions: 0}]));
+    for (const game of games) {
+        for (const [team, pointsFor, pointsAgainst] of [
+            [game.home_team, game.home_score, game.away_score],
+            [game.away_team, game.away_score, game.home_score],
+        ]) {
+            stats[team].pointsFor += pointsFor;
+            stats[team].pointsAgainst += pointsAgainst;
+            stats[team].possessions += game.possessions;
+        }
+    }
+    return Object.fromEntries(Object.entries(stats).map(([team, totals]) => {
+        const ortg = 100 * totals.pointsFor / totals.possessions;
+        const drtg = 100 * totals.pointsAgainst / totals.possessions;
+        return [team, {ortg, drtg, netRating: ortg - drtg}];
+    }));
 }
 
 function calculatePowerRatings(beta, games) {
@@ -312,15 +275,15 @@ function calculatePowerRatings(beta, games) {
 
     const teamRecords = calculateTeamRecords(games);
 
-    const decomposition = calculateRatingDecomposition(games);
+    const efficiency = calculateTeamEfficiency(games);
 
     const ratings = teamBetas.map((rawRating, index) => {
         const teamAbbr = INDEX_TEAM_MAP[index + 1];
         const record = teamRecords[teamAbbr];
-        const decompStats = decomposition[teamAbbr];
+        const teamEfficiency = efficiency[teamAbbr];
         const rating = rawRating - meanBeta;
 
-        const sos = rating - decompStats.avgPointDiff;
+        const sos = rating - teamEfficiency.netRating;
 
         return {
             team: teamAbbr,
@@ -329,7 +292,7 @@ function calculatePowerRatings(beta, games) {
             wins: record.wins,
             losses: record.losses,
             ties: record.ties,
-            avgPointDiff: decompStats.avgPointDiff,
+            ...teamEfficiency,
             sos: sos,
         };
     });
@@ -411,23 +374,12 @@ function sortRatings(ratings) {
 
                 comparison = a.ties - b.ties;
                 break;
-            case 'pointdiff':
-
-                comparison = a.avgPointDiff - b.avgPointDiff;
-                break;
+            case 'netRating':
+            case 'ortg':
+            case 'drtg':
             case 'sos':
-
-                comparison = a.sos - b.sos;
+                comparison = a[sortColumn] - b[sortColumn];
                 break;
-            case 'movementPoints':
-            case 'movementRanks': {
-                const field = sortColumn === 'movementPoints' ? 'points' : 'ranks';
-                const left = movement.get(a.team)?.[field];
-                const right = movement.get(b.team)?.[field];
-                if (left == null || right == null) return left == null ? (right == null ? 0 : 1) : -1;
-                comparison = left - right;
-                break;
-            }
             case 'rank':
             default:
 
@@ -471,7 +423,7 @@ function handleSortClick(event) {
         appState.sortDirection = appState.sortDirection === 'asc' ? 'desc' : 'asc';
     } else {
         appState.sortColumn = column;
-        appState.sortDirection = ['rank', 'team'].includes(column) ? 'asc' : 'desc';
+        appState.sortDirection = ['rank', 'team', 'drtg'].includes(column) ? 'asc' : 'desc';
     }
 
     savePreferences();
@@ -491,7 +443,7 @@ function renderTableBody() {
         const originalRank = appState.currentRatings
             .filter((t) => t.rating > teamData.rating).length + 1;
 
-        const { team, teamName, rating, wins, losses, avgPointDiff, sos } = teamData;
+        const { team, teamName, rating, wins, losses, netRating, ortg, drtg, sos } = teamData;
 
         const row = document.createElement('tr');
 
@@ -502,11 +454,11 @@ function renderTableBody() {
             ratingClass = 'rating-cell--negative';
         }
 
-        let pointDiffClass = 'rating-cell--neutral';
-        if (avgPointDiff > 0.5) {
-            pointDiffClass = 'rating-cell--positive';
-        } else if (avgPointDiff < -0.5) {
-            pointDiffClass = 'rating-cell--negative';
+        let netRatingClass = 'rating-cell--neutral';
+        if (netRating > 0.5) {
+            netRatingClass = 'rating-cell--positive';
+        } else if (netRating < -0.5) {
+            netRatingClass = 'rating-cell--negative';
         }
 
         let sosClass = 'rating-cell--neutral';
@@ -528,10 +480,11 @@ function renderTableBody() {
   <td class="record-cell">${wins}</td>
   <td class="record-cell">${losses}</td>
   
-  <td class="movement">${movementText(team, false)}</td><td class="movement">${movementText(team, true)}</td>
-  <td class="rating-cell numeric-cell ${pointDiffClass}">
-    ${signedValue(avgPointDiff)}
+  <td class="rating-cell numeric-cell ${netRatingClass}">
+    ${signedValue(netRating)}
   </td>
+  <td class="numeric-cell">${ortg.toFixed(1)}</td>
+  <td class="numeric-cell">${drtg.toFixed(1)}</td>
   <td class="rating-cell numeric-cell ${sosClass}">
     ${signedValue(sos)}
   </td>
@@ -582,14 +535,6 @@ function signedValue(value) {
     return `${rounded > 0 ? '+' : ''}${rounded.toFixed(1)}`;
 }
 
-function movementText(team, ranks) {
-    const item = movement.get(team);
-    if (!item) return '—';
-    const value = ranks ? item.ranks : item.points;
-    const formatted = ranks ? String(value) : Number(value.toFixed(1)).toFixed(1);
-    return (Number(formatted) > 0 ? '+' : '') + formatted;
-}
-
 function matchupMargin(a, b, venue, hfa) {
     return a - b + (venue === 'a' ? hfa : venue === 'b' ? -hfa : 0);
 }
@@ -610,7 +555,7 @@ function updateMatchup() {
     const second = appState.currentRatings.find(t => t.team === b);
     if (!first || !second) { output.textContent = 'Ratings are not available for this selection.'; return; }
     const margin = matchupMargin(first.rating, second.rating, document.getElementById('matchup-venue').value, appState.currentHFA);
-    output.textContent = Math.abs(margin) < 0.05 ? 'Even matchup' : `${margin > 0 ? first.teamName : second.teamName} by ${Math.abs(margin).toFixed(1)} points`;
+    output.textContent = Math.abs(margin) < 0.05 ? 'Even matchup' : `${margin > 0 ? first.teamName : second.teamName} by ${Math.abs(margin).toFixed(1)} points per 100 possessions`;
 }
 
 function initializeFloatingHeader() {
@@ -686,9 +631,9 @@ function renderMobileMatchup(teams) {
         ['Rank', t => appState.currentRatings.filter(other => other.rating > t.rating).length + 1],
         ['Rating', t => signedValue(t.rating)],
         ['Record (W–L)', t => `${t.wins}–${t.losses}`],
-        ['Δ Rating', t => movementText(t.team,false)],
-        ['Δ Rank', t => movementText(t.team,true)],
-        ['Pt Diff', t => signedValue(t.avgPointDiff)],
+        ['Net Rating', t => signedValue(t.netRating)],
+        ['ORTG', t => t.ortg.toFixed(1)],
+        ['DRTG', t => t.drtg.toFixed(1)],
         ['SOS', t => signedValue(t.sos)]
     ];
     for (const [label, value] of metrics) {
@@ -709,7 +654,7 @@ function renderMatchupStats(teams) {
         const row = document.createElement('tr');
         const rank = appState.currentRatings.filter(t => t.rating > team.rating).length + 1;
         const signed = signedValue;
-        for (const value of [rank, team.teamName, signed(team.rating), team.wins, team.losses, movementText(abbr,false), movementText(abbr,true), signed(team.avgPointDiff), signed(team.sos)]) {
+        for (const value of [rank, team.teamName, signed(team.rating), team.wins, team.losses, signed(team.netRating), team.ortg.toFixed(1), team.drtg.toFixed(1), signed(team.sos)]) {
             const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell);
         }
         body.appendChild(row);
@@ -733,7 +678,6 @@ const elements = {
 const appState = {gamesData: [], currentRatings: [], currentHFA: 0, sortColumn: 'rating', sortDirection: 'desc', loadingData: false};
 let TEAM_INDEX_MAP = {}, INDEX_TEAM_MAP = {}, TEAM_NAMES = {};
 let NUM_TEAMS = 0, NUM_PREDICTORS = 1;
-let movement = new Map();
 let calculationVersion = 0;
 let scrubDates = [];
 
@@ -751,9 +695,9 @@ function selectionLabel() {
 function parseCSV(text) {
     const lines = text.trim().split(/\r?\n/);
     const header = parseCSVLine(lines.shift().replace(/^\uFEFF/, ''));
-    const required = ['game_id','game_date','season','game_type','neutral_site','team_abbreviation_home','team_abbreviation_road','pts_home','pts_road'];
+    const required = ['game_id','game_date','season','game_type','neutral_site','team_abbreviation_home','team_abbreviation_road','pts_home','pts_road', ...['home','road'].flatMap(side => ['fga','fta','oreb','tov'].map(stat => `${stat}_${side}`))];
     const columns = Object.fromEntries(header.map((name,i) => [name,i]));
-    if (required.some(key => columns[key] === undefined)) throw new Error('Choose a full-game NBA team_game_logs CSV with dates, teams, scores, game types, and neutral-site flags.');
+    if (required.some(key => columns[key] === undefined)) throw new Error('Choose a full-game NBA team_game_logs CSV with dates, teams, scores, game types, neutral-site flags, and FGA/FTA/OREB/TOV for both teams.');
     const games = [], seen = new Set();
     const today = new Date().toLocaleDateString('en-CA', {timeZone:'America/New_York'});
     for (const [index,line] of lines.entries()) {
@@ -779,7 +723,16 @@ function parseCSV(text) {
         if (!['true','false'].includes(neutral)) throw new Error(`Invalid neutral-site flag on CSV row ${index+2}.`);
         const gameType = ({playoff:'playoffs', playin:'play_in'})[get('game_type')] || get('game_type');
         if (!['regular_season','nba_cup_semi','nba_cup_final','play_in','playoffs'].includes(gameType)) throw new Error(`Unknown game type on CSV row ${index+2}.`);
-        games.push({game_id:id, season, gameday:date, game_type:gameType, home_team:home, away_team:away,
+        const boxScores = ['home','road'].map(side => Object.fromEntries(['fga','fta','oreb','tov'].map(stat => {
+            const raw = get(`${stat}_${side}`);
+            if (raw == null || raw.trim() === '' || !Number.isInteger(Number(raw)) || Number(raw) < 0) {
+                throw new Error(`Invalid possession stat ${stat}_${side} on CSV row ${index+2}.`);
+            }
+            return [stat, Number(raw)];
+        })));
+        const possessions = estimatePossessions(...boxScores);
+        if (!Number.isFinite(possessions) || possessions <= 0) throw new Error(`Invalid estimated possessions on CSV row ${index+2}.`);
+        games.push({possessions, game_id:id, season, gameday:date, game_type:gameType, home_team:home, away_team:away,
             home_name:get('team_name_home') || home, away_name:get('team_name_road') || away,
             home_score:Number(get('pts_home')), away_score:Number(get('pts_road')), location:neutral === 'true' ? 'Neutral' : 'Home'});
     }
@@ -817,7 +770,6 @@ function savePreferences() {
 }
 function invalidateResults() {
     appState.currentRatings = [];
-    movement.clear();
     elements.resultsSection.classList.remove('results-section--visible');
     showView();
 }
@@ -885,25 +837,6 @@ function initializeScrubbers() {
         }
     }
 }
-function calculateMovement(season,start,end,results) {
-    movement.clear();
-    const priorEnd = new Date(Date.parse(end + 'T12:00:00Z') - 7*86400000).toISOString().slice(0,10);
-    const previous = filterGames(appState.gamesData,season,start,priorEnd);
-    const note = document.getElementById('comparison-note');
-    try {
-        if (previous.length < NUM_TEAMS) throw new Error('Insufficient history');
-        const {X,y} = buildDesignMatrix(previous);
-        const prior = calculatePowerRatings(performOLSRegression(X,y),previous).ratings;
-        for (const team of results.ratings) {
-            const old = prior.find(t => t.team === team.team);
-            movement.set(team.team,{points:team.rating-old.rating,ranks:prior.filter(t => t.rating>old.rating).length-results.ratings.filter(t => t.rating>team.rating).length});
-        }
-        note.textContent = `Movement since ${formatDate(priorEnd)}, using the same start date.`;
-    } catch {
-        movement.clear();
-        note.textContent = 'Weekly movement unavailable: the earlier range does not contain enough games to estimate every team.';
-    }
-}
 async function calculateRatings(scrubbing = false) {
     const version = ++calculationVersion;
     const keepVisible = scrubbing && appState.currentRatings.length > 0;
@@ -923,7 +856,6 @@ async function calculateRatings(scrubbing = false) {
         if (games.length < NUM_TEAMS) throw new Error(`Only ${games.length} games in this range. Select a wider date range.`);
         const {X,y} = buildDesignMatrix(games);
         const results = calculatePowerRatings(performOLSRegression(X,y),games);
-        calculateMovement(season,start,end,results);
         renderResultsTable(results,games.length);
         savePreferences();
         hideStatus();

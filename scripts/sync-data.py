@@ -14,7 +14,9 @@ if not files:
     raise SystemExit(f'No full-game logs found in {args.source}')
 fields = ['game_id', 'game_date', 'season', 'game_type', 'neutral_site',
           'team_abbreviation_home', 'team_name_home', 'team_abbreviation_road',
-          'team_name_road', 'pts_home', 'pts_road']
+          'team_name_road', 'pts_home', 'pts_road'] + [
+              f'{stat}_{side}' for side in ['home', 'road']
+              for stat in ['fga', 'fta', 'oreb', 'tov']]
 output = io.StringIO(newline='')
 writer = csv.DictWriter(output, fieldnames=fields, lineterminator='\n')
 writer.writeheader()
@@ -29,8 +31,8 @@ for file in files:
                 if not row.get(field):
                     raise SystemExit(f'Missing {field} in {file}: {row["game_id"]}')
             for side in ['home', 'road']:
-                if not row[f'pts_{side}'].isdigit():
-                    raise SystemExit(f'Invalid score in {file}: {row["game_id"]}')
+                if any(not row[f'{stat}_{side}'].isdigit() for stat in ['pts', 'fga', 'fta', 'oreb', 'tov']):
+                    raise SystemExit(f'Invalid box score in {file}: {row["game_id"]}')
             writer.writerow({field: row[field] for field in fields})
 target = Path(__file__).resolve().parents[1] / 'data' / 'games.js'
 target.parent.mkdir(exist_ok=True)

@@ -31,7 +31,7 @@
     <link rel="canonical" href="https://millxing.github.io/NBA_Ratings/">
     <meta property="og:type" content="website">
     <meta property="og:title" content="NBA Power Ratings">
-    <meta property="og:description" content="Point differential. Strength of schedule. A clearer view of NBA team strength.">
+    <meta property="og:description" content="Net Rating. Offensive and defensive efficiency. A clearer view of NBA team strength.">
     <meta property="og:url" content="https://millxing.github.io/NBA_Ratings/">
     <meta property="og:image" content="https://millxing.github.io/NBA_Ratings/assets/social/nba-power-ratings.png">
     <meta property="og:image:type" content="image/png">
@@ -40,7 +40,7 @@
     <meta property="og:image:alt" content="NBA Power Ratings in white lettering over a basketball hoop, ratings bars, and a basketball on a hardwood court with blue and red lighting.">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="NBA Power Ratings">
-    <meta name="twitter:description" content="Point differential. Strength of schedule. A clearer view of NBA team strength.">
+    <meta name="twitter:description" content="Net Rating. Offensive and defensive efficiency. A clearer view of NBA team strength.">
     <meta name="twitter:image" content="https://millxing.github.io/NBA_Ratings/assets/social/nba-power-ratings.png">
     <meta name="twitter:image:alt" content="NBA Power Ratings in white lettering over a basketball hoop, ratings bars, and a basketball on a hardwood court with blue and red lighting.">
 
@@ -143,11 +143,8 @@
         .rating-cell--positive { color:var(--positive); }
         .rating-cell--negative { color:var(--negative); }
         .rating-cell--neutral { color:var(--text); }
-        .movement { color:var(--muted); }
         .hfa-display { display:flex; gap:8px; align-items:baseline; margin-top:16px; color:var(--muted); font-size:14px; }
         .hfa-display__value { color:var(--text); font-weight:700; font-variant-numeric:tabular-nums; }
-        #comparison-note { font-size:14px; color:var(--muted); }
-        #comparison-note:empty { display:none; }
         .table-help { display:flex; gap:16px; flex-wrap:wrap; color:var(--muted); font-size:13px; margin:10px 0 0; }
         .table-help summary { cursor:pointer; }
         .table-help p { max-width:680px; }
@@ -292,7 +289,9 @@
                             <th data-sort="wins" scope="col" aria-sort="none"><button class="sort-button" type="button">Wins <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                             <th data-sort="losses" scope="col" aria-sort="none"><button class="sort-button" type="button">Losses <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                             
-                            <th data-sort="movementPoints" aria-sort="none" title="Rating points gained or lost since the seven days earlier"><button class="sort-button" type="button">Δ Rating <span class="sort-indicator" aria-hidden="true">↕</span></button></th><th data-sort="movementRanks" aria-sort="none" title="Ranks gained or lost since the seven days earlier"><button class="sort-button" type="button">Δ Rank <span class="sort-indicator" aria-hidden="true">↕</span></button></th><th data-sort="pointdiff" scope="col" aria-sort="none"><button class="sort-button" type="button">Pt Diff <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="netRating" scope="col" aria-sort="none"><button class="sort-button" type="button">Net Rating <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="ortg" scope="col" aria-sort="none"><button class="sort-button" type="button">ORTG <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th data-sort="drtg" scope="col" aria-sort="none"><button class="sort-button" type="button">DRTG <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                             <th data-sort="sos" scope="col" aria-sort="none"><button class="sort-button" type="button">SOS <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                         </tr>
                     </thead>
@@ -302,13 +301,12 @@
                 </table>
             </div>
 
-            <div class="table-help"><details><summary>How to read the ratings</summary><p>Rating estimates points above or below an average team on a neutral court. Pt Diff is average scoring margin; SOS is strength of schedule. Δ Rating and Δ Rank compare with ratings through seven days earlier. Positive rank movement means a climb.</p></details></div>
-            <p id="comparison-note"></p>
+            <div class="table-help"><details><summary>How to read the ratings</summary><p>All ratings use the selected dates and game selection. Rating is opponent- and home-court-adjusted Net Rating, centered at zero. ORTG is points scored per 100 possessions; DRTG is points allowed (lower is better). Net Rating is ORTG minus DRTG; SOS is Rating minus Net Rating. Possessions are estimated from each team’s FGA + 0.44 × FTA − OREB + TOV, averaged across both teams. ORTG and DRTG use total points divided by total estimated possessions. <a href="https://hoopr.sportsdataverse.org/articles/basketball-advanced-metrics.html">Possession estimate</a>.</p></details></div>
             <!-- Home Court Advantage Display -->
             <div class="hfa-display" title="Estimated using non-neutral games only, adjusting for team strength. Ratings then use all games with this estimate fixed; neutral sites receive zero home advantage.">
                 <span class="hfa-display__label">Home Court Advantage:</span>
                 <span id="hfa-value" class="hfa-display__value">0.0</span>
-                <span class="hfa-display__unit">points</span>
+                <span class="hfa-display__unit">points per 100 possessions</span>
             </div>
         </section>
 
@@ -321,7 +319,7 @@
                 <div class="form-field"><label for="matchup-venue" class="form-field__label">Venue</label><select id="matchup-venue" class="form-field__select"><option value="neutral">Neutral court</option><option value="a">Team A home</option><option value="b">Team B home</option></select></div>
               </div>
               <p id="matchup-result" aria-live="polite"></p>
-              <div class="table-container" tabindex="0" role="region" aria-label="Matchup statistics"><table class="results-table"><thead><tr><th>Rank</th><th>Team</th><th>Rating</th><th>W</th><th>L</th><th>Δ Rating</th><th>Δ Rank</th><th>Pt Diff</th><th>SOS</th></tr></thead><tbody id="matchup-stats"></tbody></table></div>
+              <div class="table-container" tabindex="0" role="region" aria-label="Matchup statistics"><table class="results-table"><thead><tr><th>Rank</th><th>Team</th><th>Rating</th><th>W</th><th>L</th><th>Net Rating</th><th>ORTG</th><th>DRTG</th><th>SOS</th></tr></thead><tbody id="matchup-stats"></tbody></table></div>
               <div class="mobile-matchup" id="mobile-matchup"></div>
             </section>
 

@@ -11,14 +11,14 @@ The app includes:
 - Seasons from 2000–01 through 2026–27, using historical team names and the actual number of teams.
 - Inclusive start/end dates, with automatic recalculation. Compact sliders and previous/next buttons beneath both dates step through recorded game dates without crossing the other boundary. Arrow keys also move the focused slider; the table remains visible while scrubbing updates settle.
 - Regular season, playoffs, and all-games selections.
-- Sortable ratings, wins/losses, point differential, strength of schedule, and rating/rank movement since seven days before the selected end date.
+- Sortable adjusted ratings, wins/losses, Net Rating, ORTG, DRTG, and strength of schedule for the selected dates and game selection.
 - A matchup calculator with neutral court or either team's home court.
 - Saved season, start date, game selection, and matchup preferences in browser storage. Each opening starts with Rating sorted highest first and the latest available end date for the selected season and game selection.
 - Full-game NBA CSV import and refresh of the bundled dataset.
 
 ## Data
 
-`data/games.js` is a portable export of `../NBA_Data/team_game_logs/team_game_logs_YYYY-YY.csv`. It contains the columns needed for ratings, with one row per completed game. Quarter, clutch, and garbage-filtered datasets are deliberately excluded. The bundle grows as new results arrive; the app displays the latest included game date.
+`data/games.js` is a portable export of `../NBA_Data/team_game_logs/team_game_logs_YYYY-YY.csv`. It contains scores and FGA/FTA/OREB/TOV for both teams, with one row per completed game. Quarter, clutch, and garbage-filtered datasets are deliberately excluded. The bundle grows as new results arrive; the app displays the latest included game date.
 
 The parser handles the source's ISO and M/D/YY dates, alternate `playoff`/`playoffs` and `playin`/`play_in` labels, and case variations in neutral-site flags. Future-dated rows are excluded. Invalid completed scores, duplicate game IDs, and malformed identities are rejected.
 
@@ -65,13 +65,16 @@ Then click **Refresh data** in Source details, or reload the app. If hosted, pub
 
 The model preserves the NFL app's two-stage fitting procedure:
 
-1. Estimate home-court advantage and team effects using non-neutral games.
-2. Hold that advantage fixed and estimate team ratings from all selected games, applying zero home advantage at neutral sites.
-3. Center team ratings at zero. A rating measures points above or below the average participating team. SOS is rating minus average scoring margin, matching the NFL app's definition.
+1. Estimate each game’s possessions as the average of both teams’ `FGA + 0.44 × FTA − OREB + TOV` ([formula reference](https://hoopr.sportsdataverse.org/articles/basketball-advanced-metrics.html)). Fit game Net Rating: `100 × (home points − away points) / estimated possessions`.
+2. Estimate home-court advantage and team effects using non-neutral games.
+3. Hold that advantage fixed and estimate team ratings from all selected games, applying zero home advantage at neutral sites.
+4. Center team ratings at zero. Rating measures opponent- and home-court-adjusted points per 100 possessions above or below the average participating team. SOS is Rating minus unadjusted Net Rating.
 
 Ratings use the teams represented in the chosen season and game category. Narrow ranges with missing teams or disconnected opponents cannot identify all ratings and produce a clear error. An entirely neutral-site selection, such as the 2020 playoffs, cannot estimate home-court advantage under this model; use a wider game selection including non-neutral games. No arbitrary fallback advantage is inserted.
 
-Movement uses the same start date and game selection, with the end date moved back seven calendar days. It is unavailable when the earlier sample cannot identify every team's rating. Matchup projections estimate a margin, not a total score or betting probability.
+ORTG is `100 × total points scored / total estimated possessions`; DRTG is `100 × total points allowed / total estimated possessions`. Net Rating is ORTG minus DRTG. These aggregate rates weight games by possessions. The OLS model gives each game equal weight. Possessions are box-score estimates, so these metrics can differ from NBA.com’s possession-based ratings. Imports require FGA, FTA, OREB, and TOV for both teams; score-only files cannot calculate efficiency.
+
+Home-court advantage and matchup projections use points per 100 possessions. Matchup projections estimate an efficiency margin, not a full-game point spread, total score, or betting probability.
 
 ## Verification
 
@@ -79,7 +82,7 @@ Movement uses the same start date and game selection, with the end date moved ba
 node tests/ratings-model.cjs
 ```
 
-This checks known coefficients, neutral-site treatment, singular samples, all 27 regular seasons, historical team counts, records, game classification, imports, and matchup arithmetic.
+This checks known coefficients, pace normalization, possession-weighted efficiency, possession-stat validation, neutral-site treatment, singular samples, all 27 regular seasons, historical team counts, records, game classification, imports, and matchup arithmetic.
 
 Optional browser checks require Playwright and Chromium already installed:
 
