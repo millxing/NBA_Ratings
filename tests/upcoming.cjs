@@ -1,0 +1,76 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const root = path.resolve(__dirname,'..');
+const context = vm.createContext({console,Intl,Date,location:{protocol:'https:'},window:{},document:{getElementById:()=>({value:'regular'}),addEventListener(){}}});
+for (const file of ['app.js','data/games.js','data/forecast.js','upcoming.js']) vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context);
+const close = (a,b)=>assert.ok(Math.abs(a-b)<1e-7, `${a} != ${b}`);
+assert.equal(context.espnTeam('NY'),'NYK');
+assert.equal(context.espnTeam('GS'),'GSW');
+assert.equal(context.espnTeam('WSH'),'WAS');
+assert.equal(context.espnTeam('SA'),'SAS');
+assert.equal(context.espnTeam('NO'),'NOP');
+assert.equal(context.espnTeam('UTAH'),'UTA');
+assert.equal(context.espnHomeSpread([]),null);
+assert.equal(context.espnHomeSpread([{pointSpread:{home:{close:{line:null}}}}]),null);
+assert.equal(context.espnHomeSpread([{pointSpread:{home:{close:{line:'+1.5'}}},provider:{name:'DraftKings'}}]).line,1.5);
+assert.equal(context.espnHomeSpread([{spread:-4,homeTeamOdds:{favorite:true}}]).line,-4);
+assert.equal(context.espnHomeSpread([{spread:4,awayTeamOdds:{favorite:true}}]).line,4);
+assert.equal(context.espnHomeSpread([{spread:0}]).line,0);
+assert.equal(context.espnHomeSpread([{spread:8}]),null);
+assert.equal(context.spreadLabel('NYK','MIL',-5),'NYK −5.0');
+assert.equal(context.spreadLabel('NYK','MIL',5),'MIL −5.0');
+assert.equal(context.spreadLabel('NYK','MIL',0),'Pick’em');
+assert.equal(context.easternDate(new Date('2026-11-11T02:00Z')),'2026-11-10');
+assert.equal(context.upcomingDates(new Date('2026-12-31T17:00Z'))[1],'2027-01-01');
+assert.equal(context.upcomingDates(new Date('2026-03-08T06:00Z'))[1],'2026-03-09');
+const row=(id,home,away,possessions=100,minutes=48)=>({id,home,away,possessions,minutes});
+let paceRows=[row('1','BOS','NYK',110,53),row('2','BOS','NYK',100,48)];
+let sample=paceRows.map(r=>({game_id:r.id}));
+close(context.forecastPace(paceRows,sample,'BOS','NYK').pace,99.8); // 210*48/101, rounded once.
+assert.throws(()=>context.forecastPace([],sample,'BOS','NYK'),/incomplete/);
+assert.throws(()=>context.forecastPace([paceRows[0],paceRows[0]],sample,'BOS','NYK'),/incomplete/);
+paceRows=Array.from({length:28},(_,i)=>row(String(i),'BOS','NYK',100));
+paceRows.push(row('other','LAL','GSW',130));
+sample=paceRows.map(r=>({game_id:r.id}));
+assert.equal(context.forecastPace(paceRows,sample,'BOS','NYK').method,'Team average');
+close(context.forecastPace(paceRows,sample,'BOS','NYK').pace,100);
+paceRows.splice(0,1); sample=paceRows.map(r=>({game_id:r.id}));
+assert.equal(context.forecastPace(paceRows,sample,'BOS','NYK').method,'League');
+const ratings={ratings:[{team:'BOS',rating:5},{team:'NYK',rating:-2}],homeFieldAdvantage:3,games:sample};
+close(context.gameForecast({home:'BOS',away:'NYK',neutral:false},ratings,paceRows).margin,10*context.forecastPace(paceRows,sample,'BOS','NYK').pace/100);
+close(context.gameForecast({home:'BOS',away:'NYK',neutral:true},ratings,paceRows).margin,7*context.forecastPace(paceRows,sample,'BOS','NYK').pace/100);
+const bundle=context.window.NBA_FORECAST;
+const games=context.parseCSV(context.window.NBA_CSV);
+const testSeason=Math.max(...games.filter(g=>g.gameday.slice(5)<='06-30').map(g=>g.season));
+const today=`${testSeason+1}-09-01`;
+const baseline=context.forecastRatings(games,testSeason,today);
+assert.ok(baseline.games.every(g=>g.gameday<today));
+const altered=games.map(g=>g.gameday>=today ? {...g,home_score:999} : g);
+altered.push({...baseline.games[0],gameday:today,home_score:999});
+assert.equal(JSON.stringify(context.forecastRatings(altered,testSeason,today).ratings),JSON.stringify(baseline.ratings));
+context.configureTeams([{home_team:'OLD',away_team:'ABC',home_name:'Old',away_name:'Other'}]);
+const before=vm.runInContext('JSON.stringify([TEAM_INDEX_MAP,INDEX_TEAM_MAP,TEAM_NAMES,NUM_TEAMS,NUM_PREDICTORS])',context);
+context.forecastRatings(games,testSeason,today);
+assert.equal(vm.runInContext('JSON.stringify([TEAM_INDEX_MAP,INDEX_TEAM_MAP,TEAM_NAMES,NUM_TEAMS,NUM_PREDICTORS])',context),before);
+assert.throws(()=>context.forecastRatings([],testSeason,today),/Not enough/);
+assert.equal(vm.runInContext('JSON.stringify([TEAM_INDEX_MAP,INDEX_TEAM_MAP,TEAM_NAMES,NUM_TEAMS,NUM_PREDICTORS])',context),before);
+const snapshotDay=bundle.dates[0] || new Date().toISOString().slice(0,10);
+const now=new Date(snapshotDay+'T12:00:00Z');
+const scheduled=context.scheduledGames(bundle,now);
+let current;
+try { current=context.forecastRatings(games,bundle.season,snapshotDay); }
+catch(error) { assert.match(error.message,/Not enough|cannot identify/); }
+if (current) for(const g of scheduled.filter(g=>g.season===bundle.season)) {
+ const covered=new Set(bundle.paceGames.map(r=>r.id));
+ if (current.games.every(g=>covered.has(g.game_id))) {
+  const forecast=context.gameForecast(g,current,bundle.paceGames);
+  assert.ok(forecast.pace>50 && forecast.pace<150 && Number.isFinite(forecast.margin));
+ } else assert.throws(()=>context.gameForecast(g,current,bundle.paceGames),/incomplete/);
+}
+const finished=JSON.parse(JSON.stringify(bundle));
+for(const e of finished.events) e.competitions[0].status={type:{name:'STATUS_FINAL',state:'post'}};
+assert.equal(context.scheduledGames(finished,now).length,0);
+assert.equal(context.scheduledGames(bundle,new Date('2099-01-01T12:00Z')).length,0);
+console.log(`PASS: spread signs, team aliases, ET/DST boundaries, overtime pace, 28-game switch, neutral court, missing coverage, no hindsight, model context restoration and ${scheduled.length} bundled forecasts.`);

@@ -892,12 +892,14 @@ function describeData(games,source) {
 function acceptData(games,source,preserve = false) {
     const oldSeason = elements.seasonSelect.value;
     appState.gamesData = games;
+    appState.imported = source.startsWith('Imported CSV:');
     elements.seasonSelect.replaceChildren();
     [...new Set(games.map(g => g.season))].sort((a,b) => b-a).forEach(season => elements.seasonSelect.add(new Option(seasonLabel(season),String(season))));
     if (preserve && [...elements.seasonSelect.options].some(o => o.value === oldSeason)) elements.seasonSelect.value = oldSeason;
     updateRange(true);
     describeData(games,source);
     elements.fileUploadSection.style.display = 'none';
+    if (typeof renderUpcoming === 'function') renderUpcoming();
 }
 async function loadBundle() {
     // A script bundle works both when hosted and when this HTML is opened directly.
@@ -913,6 +915,13 @@ async function refreshData() {
     ++calculationVersion;
     setLoading(true);
     try {
+        await new Promise(resolve => {
+            const script = document.createElement('script');
+            script.src = `data/forecast.js?v=${Date.now()}`;
+            script.onload = () => { upcomingState.snapshot = window.NBA_FORECAST; upcomingState.live = false; script.remove(); resolve(); };
+            script.onerror = () => { script.remove(); resolve(); };
+            document.head.append(script);
+        });
         acceptData(await loadBundle(),'NBA_Data full-game team logs',true);
         await calculateRatings();
     } catch(error) {
@@ -967,6 +976,6 @@ async function initializeApp() {
         }
         await calculateRatings();
     } catch(error) { showStatus(error.message,'error'); elements.fileUploadSection.style.display = 'block'; }
-    finally { setLoading(false); showView(); }
+    finally { setLoading(false); showView(); initializeUpcoming(); }
 }
 document.addEventListener('DOMContentLoaded',initializeApp);

@@ -196,6 +196,33 @@
             #matchup-result { font-size:21px; padding:16px; }
         }
         @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
+        .upcoming { margin:28px 0; padding-top:24px; border-top:1px solid var(--line); }
+        .upcoming-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+        #refresh-upcoming { border:1px solid var(--line); border-radius:5px; padding:8px 12px; background:var(--surface); color:var(--text); cursor:pointer; font-size:13px; }
+        #refresh-upcoming:disabled { opacity:.6; cursor:wait; }
+        .upcoming-header h2 { margin:0; font-size:20px; }
+        .upcoming-note { color:var(--muted); font-size:13px; line-height:1.6; margin:12px 0; }
+        .upcoming-table { width:100%; border-collapse:collapse; font-size:14px; }
+        .upcoming-table th, .upcoming-table td { text-align:left; padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+        .upcoming-table th { font-size:12px; color:var(--muted); font-weight:600; }
+        .upcoming-table small { display:block; font-size:12px; color:var(--muted); margin-top:5px; }
+        .upcoming-game { background:none; border:0; padding:0; color:var(--accent); font:inherit; text-align:left; cursor:pointer; }
+        .upcoming-game:disabled { color:var(--text); cursor:default; }
+        .upcoming-game:hover:not(:disabled) { text-decoration:underline; }
+        .upcoming-table td:first-child { min-width:125px; }
+        .upcoming-table td:nth-child(2) { min-width:210px; }
+        .upcoming-table td:nth-child(3), .upcoming-table td:nth-child(4) { min-width:100px; }
+        @media (max-width:600px) {
+            .upcoming-header { align-items:flex-start; flex-direction:column; }
+            .upcoming .table-container { border:0; }
+            .upcoming-table, .upcoming-table tbody { display:block; }
+            .upcoming-table thead { display:none; }
+            .upcoming-table tr { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:6px; margin-bottom:12px; padding:12px; gap:12px; }
+            .upcoming-table td { border:0; padding:0; min-width:0!important; }
+            .upcoming-table td:nth-child(1), .upcoming-table td:nth-child(2), .upcoming-table td:nth-child(5) { grid-column:1 / -1; }
+            .upcoming-table td:first-child { font-size:12px; color:var(--muted); }
+            .upcoming-table td[data-label]::before { content:attr(data-label); display:block; color:var(--muted); font-size:12px; margin-bottom:4px; }
+        }
     </style>
 </head>
 
@@ -320,6 +347,15 @@
               <div class="mobile-matchup" id="mobile-matchup"></div>
             </section>
 
+        <section class="upcoming" aria-labelledby="upcoming-title">
+            <div class="upcoming-header"><h2 id="upcoming-title">Upcoming games · next 2 days</h2><button id="refresh-upcoming" type="button">Refresh schedule &amp; lines</button></div>
+            <p id="upcoming-context" class="upcoming-note" role="status">Loading upcoming games…</p>
+            <div class="table-container" tabindex="0" role="region" aria-label="Upcoming game forecasts">
+                <table class="upcoming-table"><thead><tr><th scope="col">Tipoff (ET)</th><th scope="col">Matchup</th><th scope="col">Model spread</th><th scope="col">ESPN spread</th><th scope="col">Pace</th></tr></thead><tbody id="upcoming-body"></tbody></table>
+            </div>
+            <p class="upcoming-note">Spreads name the favored team; −5.0 means favored by 5 points. Model margin = adjusted efficiency margin × pace / 100. Pace uses Extra Pass Analytics’ method: actual possessions per 48 minutes, adjusted for overtime. League pace applies until both teams have played 28 regular-season games, then their average pace. Select a matchup to open the calculator with the forecast’s rating dates. ESPN lines may change or be unavailable.</p>
+        </section>
+
         <section class="data-status" aria-label="Data status">
             <div class="data-summary"><span id="data-freshness" aria-live="polite">Loading game data…</span><details><summary>Source details</summary><div class="source-content"><p id="data-source"></p><div class="v2-actions"><button id="refresh-data" type="button">Refresh data</button><button id="import-data" type="button">Import CSV</button></div></div></details></div>
             <p id="storage-note" role="status"></p>
@@ -334,6 +370,8 @@
         </footer>
     </main>
 
+    <script src="data/forecast.js"></script>
     <script src="app.js"></script>
+    <script src="upcoming.js"></script>
 </body>
 </html>

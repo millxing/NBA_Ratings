@@ -13,6 +13,7 @@ The app includes:
 - Regular season, playoffs, and all-games selections.
 - Sortable adjusted ratings, W/L, winning percentage (Pct), Net Rating, ORTG, DRTG, and strength of schedule for the selected dates and game selection.
 - A matchup calculator with neutral court or either team's home court.
+- Upcoming games for today and tomorrow (Eastern time), with model point spreads, ESPN spreads/provider, pace, and a schedule/line refresh button.
 - Saved season, start date, game selection, and matchup preferences in browser storage. Each opening starts with Rating sorted highest first and the latest available end date for the selected season and game selection.
 - Full-game NBA CSV import and refresh of the bundled dataset.
 
@@ -22,11 +23,11 @@ The app includes:
 
 The parser handles the source's ISO and M/D/YY dates, alternate `playoff`/`playoffs` and `playin`/`play_in` labels, and case variations in neutral-site flags. Future-dated rows are excluded. Invalid completed scores, duplicate game IDs, and malformed identities are rejected.
 
-Regular-season selections include NBA Cup semifinals, which count toward regular-season records. The Cup final and play-in games appear only in All games. Playoffs includes postseason playoff series, excluding play-ins. Only recorded results are used; no future schedule is required.
+Regular-season selections include NBA Cup semifinals, which count toward regular-season records. The Cup final and play-in games appear only in All games. Playoffs includes postseason playoff series, excluding play-ins. The ratings table uses only recorded results. Upcoming forecasts use a separate ESPN schedule feed.
 
 ### Automatic and manual updates
 
-GitHub Actions refreshes the bundle and publishes the site daily at **6:30 a.m. America/New_York**, adjusting for daylight saving time. Scheduled runs can start late. Each run fetches the latest `millxing/NBA_Data` game logs, exports the bundle, runs model checks, commits changed results, and deploys GitHub Pages. It does not collect NBA scores itself; results depend on NBA_Data being current.
+GitHub Actions refreshes the bundle and publishes the site daily at **6:30 a.m. America/New_York**, adjusting for daylight saving time. Scheduled runs can start late. Each run fetches the latest `millxing/NBA_Data` game logs, exports the bundle, runs model checks, exports the ESPN schedule/lines and actual pace inputs, runs forecast checks, commits changed bundles, and deploys GitHub Pages. It does not collect NBA scores itself; results depend on NBA_Data being current.
 
 To trigger an update immediately from T3 chat or an authenticated terminal, run:
 
@@ -49,6 +50,7 @@ After NBA_Data has newer game logs, run:
 
 ```sh
 python3 scripts/sync-data.py
+python3 scripts/sync-upcoming.py
 ```
 
 Or specify a different NBA_Data directory:
@@ -57,7 +59,7 @@ Or specify a different NBA_Data directory:
 python3 scripts/sync-data.py --source /path/to/NBA_Data
 ```
 
-Then click **Refresh data** in Source details, or reload the app. If hosted, publish the updated `data/games.js` alongside the app. Refresh does not run the export or fetch new NBA results itself.
+Then click **Refresh data** in Source details, or reload the app. If hosted, publish the updated `data/games.js` and `data/forecast.js` alongside the app. Refresh does not run the export or fetch new NBA results itself.
 
 **Import CSV** loads a full-game team_game_logs file for the current session, replacing the bundled dataset. Refresh restores the bundle. Invalid imports leave the previous dataset and ratings intact.
 
@@ -74,12 +76,24 @@ Ratings use the teams represented in the chosen season and game category. Narrow
 
 ORTG is `100 × total points scored / total estimated possessions`; DRTG is `100 × total points allowed / total estimated possessions`. Net Rating is ORTG minus DRTG. These aggregate rates weight games by possessions. The OLS model gives each game equal weight. Possessions are box-score estimates, so these metrics can differ from NBA.com’s possession-based ratings. Imports require FGA, FTA, OREB, and TOV for both teams; score-only files cannot calculate efficiency.
 
-Home-court advantage and matchup projections use points per 100 possessions. Matchup projections estimate an efficiency margin, not a full-game point spread, total score, or betting probability.
+Home-court advantage and the matchup calculator use points per 100 possessions. Upcoming forecasts convert the efficiency margin to a point margin using projected pace; they do not estimate totals or win probabilities.
+
+### Upcoming forecasts and ESPN lines
+
+The upcoming section shows unplayed games that have not reached tipoff today and tomorrow in America/New_York. It uses current-season regular-season ratings from the start of the season through yesterday, regardless of the ratings table's selected season, dates, or game category. The actual results cutoff is shown. Today's completed games are excluded from both ratings and pace. Clicking a forecast sets the calculator to that forecast's teams, venue, and rating dates; the calculator continues to display the efficiency margin.
+
+Pace uses the same full-game actual possessions and minutes as Extra Pass Analytics in `GLA`, from NBA_Data's `box_score_advanced_YYYY-YY.csv`, joined to regular-season completed game IDs. Each game's average home/road possessions is divided by game minutes and multiplied by 48. Season aggregates divide total possessions by total minutes, so overtime is normalized. League pace is used until **both teams have played at least 28 regular-season games** (one third of 82, rounded up); then projected pace is the mean of their season paces. Team and league rates are rounded to one decimal as in Extra Pass. Model point margin is `(home rating − away rating + home-court advantage) × pace / 100`, with no home advantage at neutral sites. Missing pace coverage or insufficient ratings produces an unavailable forecast, with a reason.
+
+ESPN's scoreboard feed supplies schedules and the sportsbook line it publishes. Spreads identify the favored team and include the provider (for example, DraftKings via ESPN). The retrieval time is shown; lines can change. Missing odds show **Not posted**, never zero. On the hosted app, live refresh is attempted on opening and via **Refresh schedule & lines**. ESPN may restrict browser requests; the dated snapshot remains available. Direct-file mode uses **Reload saved schedule** to reload the exported bundle, avoiding blocked cross-origin requests. Network failures retain the last retrieved snapshot and report the failure. Old snapshots are flagged and games outside the current window are omitted. Imported CSVs disable model forecasts until bundled results are restored, because imports do not include verified actual-pace coverage.
+
+`scripts/sync-upcoming.py` exports a portable schedule/line snapshot and current-season game-level pace inputs to `data/forecast.js`; it accepts the same `--source` option as the results exporter. The daily update publishes both bundles. Hosted browser refresh attempts to retrieve schedule/lines, while newer pace inputs require a new export. If ESPN is unavailable during export, the updater retains the previous snapshot with its original timestamp and still updates pace inputs. No API key or running GLA backend is required.
 
 ## Verification
 
 ```sh
 node tests/ratings-model.cjs
+node tests/upcoming.cjs
+python3 tests/forecast-export.py
 ```
 
 This checks known coefficients, pace normalization, possession-weighted efficiency, possession-stat validation, neutral-site treatment, singular samples, all 27 regular seasons, historical team counts, records, game classification, imports, and matchup arithmetic.
@@ -88,6 +102,7 @@ Optional browser checks require Playwright and Chromium already installed:
 
 ```sh
 node tests/browser.cjs
+node tests/upcoming-browser.cjs
 ```
 
 Set `BROWSER=webkit` to run the same interaction checks in WebKit. Set `PLAYWRIGHT_PATH` to a Playwright module path and `CHROMIUM_PATH` to a Chromium executable if they are not available at their defaults. Tests cover direct-file loading, sorting, dates, preferences, historical seasons, playoff and empty states, import/refresh, matchups, and mobile overflow. Screenshots are written to `/tmp`.

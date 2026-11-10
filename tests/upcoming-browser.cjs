@@ -1,0 +1,58 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const {pathToFileURL}=require('node:url');
+const browserType=require(process.env.PLAYWRIGHT_PATH || 'playwright')[process.env.BROWSER || 'chromium'];
+const root=path.resolve(__dirname,'..');
+const sandbox={window:{}};
+vm.runInNewContext(fs.readFileSync(path.join(root,'data/forecast.js'),'utf8'),sandbox);
+const snapshot=sandbox.window.NBA_FORECAST;
+(async()=>{
+ const browser=await browserType.launch({headless:true,...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {})});
+ try {
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});
+  const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  await page.clock.install({time:new Date(snapshot.dates[0]+'T12:00Z')});
+  await page.route('https://site.api.espn.com/**',route=>route.fulfill({json:{events:snapshot.events}}));
+  await page.route('https://nba-ratings.test/**', route => {
+   const file = new URL(route.request().url()).pathname.slice(1) || 'NBAPowerRatings.html';
+   return route.fulfill({path:path.join(root,file)});
+  });
+  await page.goto('https://nba-ratings.test/NBAPowerRatings.html');
+  await page.waitForFunction(()=>appState.currentRatings.length===30 && !upcomingState.loading);
+  const count=await page.locator('#upcoming-body tr').count();
+  assert.ok(count>0);
+  assert.match(await page.locator('#upcoming-context').innerText(),/today’s results excluded/);
+  assert.match(await page.locator('#upcoming-body').innerText(),/League/);
+  assert.equal(await page.locator('#upcoming-body button:disabled').count(),0);
+  const before=await page.locator('#upcoming-body').innerText();
+  await page.selectOption('#season-select','2025');
+  await page.waitForFunction(()=>document.querySelector('#results-range').textContent.includes('2025'));
+  assert.equal(await page.locator('#upcoming-body').innerText(),before,'Historical selection must not change current forecasts');
+  await page.locator('#upcoming-title').scrollIntoViewIfNeeded();
+  await page.screenshot({path:'/tmp/nba-upcoming-desktop.png'});
+  await page.locator('#upcoming-body button').first().click();
+  await page.waitForURL('**#matchup');
+  assert.equal(await page.locator('#season-select').inputValue(),String(snapshot.season));
+  assert.equal(await page.locator('#game-type').inputValue(),'regular');
+  assert.ok(await page.locator('#matchup-result').innerText());
+  await page.unroute('https://site.api.espn.com/**');
+  await page.route('https://site.api.espn.com/**',route=>route.abort());
+  await page.locator('#refresh-upcoming').click();
+  await page.waitForFunction(()=>!upcomingState.loading);
+  assert.match(await page.locator('#upcoming-context').innerText(),/Live refresh unavailable/);
+  assert.equal(await page.locator('#upcoming-body tr').count(),count);
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('#upcoming-title').scrollIntoViewIfNeeded();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Mobile page must not overflow');
+  await page.screenshot({path:'/tmp/nba-upcoming-mobile.png'});
+  await page.evaluate(()=>{appState.imported=true;renderUpcoming();});
+  assert.match(await page.locator('#upcoming-context').innerText(),/imported results/);
+  assert.equal(await page.locator('#upcoming-body button:disabled').count(),count);
+  await page.evaluate(()=>{appState.imported=false;upcomingState.snapshot={dates:[],events:[]};renderUpcoming();});
+  assert.match(await page.locator('#upcoming-context').innerText(),/out of date/);
+  assert.deepEqual(errors,[]);
+  console.log('PASS: 16-game fixture rendering, current forecasts independent of historical controls, forecast selection, failed-refresh fallback, imported/stale states, mobile overflow and no runtime errors.');
+ } finally {await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});
