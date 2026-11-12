@@ -27,7 +27,9 @@ Regular-season selections include NBA Cup semifinals, which count toward regular
 
 ### Automatic and manual updates
 
-GitHub Actions refreshes the bundle and publishes the site daily at **6:30 a.m. America/New_York**, adjusting for daylight saving time. Scheduled runs can start late. Each run fetches the latest `millxing/NBA_Data` game logs, exports the bundle, runs model checks, exports the ESPN schedule/lines and actual pace inputs, runs forecast checks, commits changed bundles, and deploys GitHub Pages. It does not collect NBA scores itself; results depend on NBA_Data being current.
+cron-job.org triggers the GitHub Actions update daily at **6:35 a.m. and 6:50 a.m. America/New_York**, adjusting for daylight saving time. GitHub's **6:30 a.m.** schedule remains enabled as a fallback. The external trigger avoids GitHub scheduled-event delays; runner and publication delays can still occur. Both external triggers run the full update. See [scheduling setup and maintenance](GITHUB_ACTIONS_SCHEDULING.md).
+
+Each run fetches the latest `millxing/NBA_Data` game logs, exports the bundle, runs model checks, exports the ESPN schedule/lines and actual pace inputs, runs forecast checks, commits changed bundles, and deploys GitHub Pages. It does not collect NBA scores itself; results depend on NBA_Data being current.
 
 To trigger an update immediately from T3 chat or an authenticated terminal, run:
 
