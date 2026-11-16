@@ -562,6 +562,102 @@ function updateMatchup() {
     output.textContent = Math.abs(margin) < 0.05 ? 'Even matchup' : `${margin > 0 ? first.teamName : second.teamName} by ${Math.abs(margin).toFixed(1)} points per 100 possessions`;
 }
 
+// Shared definitions keep the ratings, floating header and matchup views consistent.
+const COLUMN_HELP = {
+    Rank: 'Position by Rating among all teams in the selected game range. The highest Rating is ranked 1; ties share a rank.',
+    Team: 'Team name for the selected season.',
+    Rating: 'Opponent- and home-court-adjusted points per 100 possessions above or below the average team. Zero is average; higher is better. Uses the selected dates and game category.',
+    W: 'Wins in the selected dates and game category.',
+    L: 'Losses in the selected dates and game category.',
+    'Record (W–L)': 'Wins and losses in the selected dates and game category.',
+    Pct: 'Winning percentage: wins divided by games played in the selected range. For example, .600 means 60%.',
+    'Net Rating': 'Points scored minus points allowed per 100 estimated possessions (ORTG minus DRTG). Uses the selected range, without opponent or home-court adjustment. Higher is better.',
+    ORTG: 'Offensive rating: total points scored per 100 estimated possessions in the selected range. Higher is better.',
+    DRTG: 'Defensive rating: total points allowed per 100 estimated possessions in the selected range. Lower is better.',
+    SOS: 'Strength of schedule: Rating minus unadjusted Net Rating. Positive values indicate a tougher schedule, including opponent strength and home-court effects. Uses the selected range.',
+    'Tipoff (ET)': 'Scheduled game start in Eastern Time. This list covers games that have not started today and tomorrow.',
+    Matchup: 'Away team at home team; neutral courts are marked. Select a game to load its teams, venue and rating dates in the matchup calculator.',
+    'Model spread': 'Predicted point spread using current-season regular-season ratings through yesterday and projected pace. A negative number marks the favorite. Independent of the table filters.',
+    'ESPN spread': 'Sportsbook point spread published by ESPN, with the provider shown below. A negative number marks the favorite. Lines can change; Not posted means no line is available.',
+    Pace: 'Projected possessions per team per 48 minutes. Uses league pace until both teams have played 28 regular-season games, then the average of their season paces. Uses results through yesterday.'
+};
+
+function addColumnHelp(header) {
+    const label = header.textContent.trim();
+    if (!COLUMN_HELP[label]) return;
+    let trigger = header.querySelector('button');
+    if (!trigger) {
+        trigger = document.createElement('span');
+        trigger.className = 'column-help-label';
+        trigger.tabIndex = 0;
+        trigger.textContent = label;
+        header.replaceChildren(trigger);
+    }
+    trigger.dataset.columnHelp = label;
+    trigger.setAttribute('aria-describedby', `column-help-${Object.keys(COLUMN_HELP).indexOf(label)}`);
+}
+
+function initializeColumnHelp() {
+    Object.values(COLUMN_HELP).forEach((text, index) => {
+        const description = document.createElement('span');
+        description.id = `column-help-${index}`;
+        description.hidden = true;
+        description.textContent = text;
+        document.body.append(description);
+    });
+    document.querySelectorAll('thead th').forEach(addColumnHelp);
+    // Keep the popup outside scroll containers so it is never clipped by a table.
+    const tooltip = document.createElement('div');
+    tooltip.className = 'column-tooltip';
+    tooltip.setAttribute('aria-hidden', 'true');
+    tooltip.hidden = true;
+    document.body.append(tooltip);
+    let timer, active, lastShown = 0;
+    function hide() {
+        clearTimeout(timer);
+        if (!tooltip.hidden) lastShown = Date.now();
+        tooltip.hidden = true;
+        active = null;
+    }
+    function show(trigger, delay) {
+        clearTimeout(timer);
+        active = trigger;
+        const open = () => {
+            if (!trigger.isConnected || !trigger.getClientRects().length) return hide();
+            tooltip.textContent = COLUMN_HELP[trigger.dataset.columnHelp];
+            tooltip.hidden = false;
+            const rect = trigger.getBoundingClientRect();
+            const box = tooltip.getBoundingClientRect();
+            tooltip.style.left = `${Math.max(12, Math.min(rect.left + (rect.width - box.width) / 2, innerWidth - box.width - 12))}px`;
+            const top = rect.bottom + 8;
+            tooltip.style.top = `${Math.max(12, top + box.height <= innerHeight - 12 ? top : rect.top - box.height - 8)}px`;
+        };
+        if (delay && tooltip.hidden && Date.now() - lastShown > 500) timer = setTimeout(open, 350);
+        else open();
+    }
+    document.addEventListener('pointerover', event => {
+        const trigger = event.target.closest('[data-column-help]');
+        if (trigger && trigger !== active && event.pointerType !== 'touch') show(trigger, true);
+    });
+    document.addEventListener('pointerout', event => {
+        if (active && active.contains(event.target) && !active.contains(event.relatedTarget) && !tooltip.contains(event.relatedTarget)) {
+            clearTimeout(timer);
+            timer = setTimeout(hide, 120);
+        }
+    });
+    tooltip.addEventListener('pointerenter', () => clearTimeout(timer));
+    tooltip.addEventListener('pointerleave', hide);
+    document.addEventListener('focusin', event => {
+        const trigger = event.target.closest('[data-column-help]');
+        if (trigger) show(trigger, false);
+    });
+    document.addEventListener('focusout', event => { if (active && active.contains(event.target)) hide(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
+    document.addEventListener('scroll', hide, true);
+    window.addEventListener('resize', hide);
+    window.addEventListener('hashchange', hide);
+}
+
 function initializeFloatingHeader() {
     const original = document.querySelector('#results-section .results-table');
     const floating = document.createElement('div');
@@ -644,6 +740,7 @@ function renderMobileMatchup(teams) {
     for (const [label, value] of metrics) {
         const row = body.insertRow();
         const th = document.createElement('th'); th.scope = 'row'; th.textContent = label; row.append(th);
+        addColumnHelp(th);
         data.forEach(team => { row.insertCell().textContent = value(team); });
     }
     container.append(table);
@@ -942,6 +1039,7 @@ async function handleFileUpload(event) {
     finally { setLoading(false); elements.fileUpload.value = ''; }
 }
 async function initializeApp() {
+    initializeColumnHelp();
     initializeFloatingHeader();
     initializeScrubbers();
     window.addEventListener('hashchange',showView);

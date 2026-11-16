@@ -16,6 +16,20 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         };
         await page.goto(url);
         await ready();
+        const tooltip = page.locator('.column-tooltip');
+        const ratingHeader = page.locator('#results-section th[data-sort="rating"] button');
+        await ratingHeader.hover();
+        await tooltip.waitFor({state:'visible'});
+        assert.match(await tooltip.innerText(), /per 100 possessions/);
+        await page.keyboard.press('Escape');
+        assert.equal(await tooltip.isVisible(), false);
+        await ratingHeader.focus();
+        await tooltip.waitFor({state:'visible'});
+        const descriptionId = await ratingHeader.getAttribute('aria-describedby');
+        assert.equal(await page.locator(`#${descriptionId}`).textContent(), await tooltip.innerText());
+        await page.keyboard.press('Escape');
+        assert.equal(await tooltip.isVisible(), false);
+        assert.equal(await page.locator('.results-table thead th, .upcoming-table thead th').evaluateAll(headers => headers.every(header => header.querySelector('[data-column-help][aria-describedby]'))), true);
         const latest = await page.evaluate(() => {
             const games = seasonGames();
             return {dates:[...new Set(games.map(game => game.gameday))].sort(),count:String(games.length)};
@@ -116,7 +130,7 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         await ready();
         assert.equal(await page.locator('#end-date').inputValue(),latest.dates.at(-1));
         assert.equal(await page.locator('#results-section th[data-sort="rating"]').getAttribute('aria-sort'),'descending');
-        await page.locator('#start-date').fill('2026-11-06');
+        await page.locator('#start-date').fill(latest.dates.at(-1));
         await page.locator('#start-date').dispatchEvent('change');
         await page.waitForFunction(()=>document.querySelector('#status-message').textContent.includes('Select a wider'));
         assert.equal(await page.locator('#results-section').isVisible(),false);
@@ -163,6 +177,14 @@ const browserType = require(process.env.PLAYWRIGHT_PATH || 'playwright')[process
         await page.locator('#matchup-a').selectOption('BOS');
         await page.locator('#matchup-b').selectOption('NYK');
         await page.locator('#mobile-matchup').waitFor({state:'visible'});
+        await page.locator('#mobile-matchup tbody th [data-column-help="ORTG"]').focus();
+        await tooltip.waitFor({state:'visible'});
+        assert.match(await tooltip.innerText(), /Offensive rating/);
+        assert.equal(await tooltip.evaluate(node => {
+            const rect = node.getBoundingClientRect();
+            return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight;
+        }), true);
+        await page.keyboard.press('Escape');
         await page.screenshot({path:'/tmp/nba-ratings-matchup-mobile.png',fullPage:true});
         assert.deepEqual(errors,[]);
         console.log('PASS: direct-file startup, sorting, date scrubbing, rapid-input cancellation, date filtering, saved preferences, historical teams, playoffs, empty and insufficient ranges, CSV imports/rejection, refresh, matchup venues, mobile overflow and no runtime errors.');

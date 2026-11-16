@@ -135,6 +135,9 @@
         .form-field__select { scroll-margin-top:60px; }
         .sort-button { width:100%; text-align:inherit; border:0; background:transparent; padding:0; color:inherit; font-weight:600; min-height:24px; }
         .sort-button:hover,.sort-active { color:var(--accent)!important; }
+        [data-column-help] { text-decoration:underline dotted var(--muted); text-underline-offset:4px; }
+        .column-help-label { cursor:help; }
+        .column-tooltip { position:fixed; z-index:10; max-width:min(300px,calc(100vw - 24px)); padding:10px 12px; border:1px solid var(--line); border-radius:6px; background:var(--raised); color:var(--text); box-shadow:0 4px 12px #0006; font:14px/1.45 'Source Sans 3',sans-serif; }
         .rank-cell,.team-cell__abbr { color:var(--muted); }
         .team-cell { font-weight:600; }
         .team-cell__nickname { display:none; }
